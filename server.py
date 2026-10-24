@@ -73,7 +73,14 @@ def is_ean(q: str) -> bool:
 
 def canon(ean):
     """Código sin ceros a la izquierda: EAN-13 y GTIN-14 del mismo producto coinciden."""
-    return (ean or "").strip().lstrip("0") or None
+    return str(ean or "").strip().lstrip("0") or None
+
+
+def _s(v):
+    """Texto limpio aunque el dato venga como número, lista o vacío."""
+    if v is None or isinstance(v, (dict, list)):
+        return ""
+    return str(v).strip()
 
 
 UNIT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(kgs?|grs?|g|lts?|l|ml|cc)\b", re.I)
@@ -246,22 +253,22 @@ def parse_coto(results, wanted_ean=None):
     out = []
     for item in results:
         data = item.get("data") or {}
-        ean = (data.get("product_main_ean") or "").strip() or None
+        ean = _s(data.get("product_main_ean")) or None
         if wanted_ean and canon(ean) != canon(wanted_ean):
             continue
         price = _coto_price(data)
         if not price:
             continue
-        name = (item.get("value") or data.get("sku_display_name")
-                or data.get("sku_description") or "").strip()
-        url = data.get("url") or ""
+        name = (_s(item.get("value")) or _s(data.get("sku_display_name"))
+                or _s(data.get("sku_description")))
+        url = _s(data.get("url"))
         url = url if url.startswith("http") else COTO_SITE + url.lstrip("/")
         out.append({
             "store": "Coto",
             "ean": ean,
             "name": name,
-            "brand": data.get("product_brand"),
-            "image": data.get("product_large_image_url") or data.get("image_url"),
+            "brand": _s(data.get("product_brand")) or None,
+            "image": _s(data.get("product_large_image_url")) or _s(data.get("image_url")) or None,
             "price": round(price, 2),
             "list_price": round(price, 2),
             "in_stock": _coto_available(data),
