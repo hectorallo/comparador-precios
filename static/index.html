@@ -130,6 +130,7 @@
   .bestwhere a { color: inherit; }
   .bestnote { margin-left: 8px; color: var(--muted); font-size: .875rem; font-weight: 500; }
   .best-info { min-width: 0; }
+  .bestdel { flex: 1 1 100%; font-size: .875rem; }
   .best-info .where { font-weight: 700; }
   .best-info .where a { color: inherit; }
   .best-info .sub { color: var(--good); font-size: .875rem; font-weight: 600; }
@@ -196,6 +197,7 @@
   .stop .h { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; }
   .stop ul { list-style: none; padding: 0; margin: 6px 0 0; color: var(--muted); font-size: .9375rem; }
   .stop li { display: flex; justify-content: space-between; gap: 10px; }
+  .stop li span:last-child, .stop .h span:last-child { white-space: nowrap; }
   .totals { margin-top: 14px; }
   .totals .row b { font-variant-numeric: tabular-nums; }
   .backup { margin-top: 24px; font-size: .9375rem; color: var(--muted); }
@@ -224,6 +226,15 @@
   .totalbar b { font-size: 1.75rem; font-weight: 850; font-stretch: 80%; font-variant-numeric: tabular-nums; }
   .totalbar small { font-size: .875rem; opacity: .85; }
   body.incart main { padding-bottom: 130px; }
+
+  /* ---- precios cargados a mano ---- */
+  details.manual summary { cursor: pointer; padding: 10px 0 2px; color: var(--muted); font-weight: 600; font-size: .9375rem; }
+  .mform { display: grid; gap: 10px; padding: 8px 0 4px; }
+  .mform label { display: grid; gap: 4px; font-weight: 600; font-size: .9375rem; }
+  .mform select, .mform input { width: 100%; font: 500 1rem var(--font); padding: 11px 12px; border: 2px solid var(--ink); border-radius: 10px; background: var(--card); color: var(--ink); }
+  .mform .fine { margin: 0; }
+  .mform .merr:empty { display: none; }
+  .fine.bad { color: var(--promo); font-weight: 600; }
 
   /* ---- vacío, carga y errores ---- */
   .empty { text-align: center; padding: 36px 8px 8px; }
@@ -351,6 +362,68 @@ function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value
 
 let myList = load("lista-v1", []);       // [{ean, name, brand, image, qty}]
 let history = load("historial-v1", {});   // { eanSinCeros: {name, seen, pts:[{d, p:{tienda: precio}}]} }
+
+// ---- precios cargados a mano (Makro, Vital, otras tiendas sin catálogo online) ----
+// { eanSinCeros: [{store, price (del bulto), units, date}] }
+function sanitizeManuales(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, arr] of Object.entries(raw)) {
+    if (!Array.isArray(arr)) continue;
+    const ok = arr.filter((m) => m && typeof m.store === "string" && m.store.trim() && Number(m.price) > 0)
+      .map((m) => ({ store: m.store.trim().slice(0, 30), price: Number(m.price), units: Math.min(999, Math.max(1, Math.round(Number(m.units) || 1))), date: String(m.date || "").slice(0, 10) }));
+    if (ok.length) out[canon(k)] = ok;
+  }
+  return out;
+}
+let manuales = sanitizeManuales(load("manuales-v1", {}));
+const saveManuales = () => save("manuales-v1", manuales);
+const API_STORES = ["Coto", "Carrefour", "Jumbo", "Disco", "Vea", "Día", "ChangoMás", "Toledo"];
+function manualStoreNames() {
+  const s = new Set(["Makro", "Vital"]);
+  Object.values(manuales).forEach((a) => a.forEach((m) => s.add(m.store)));
+  return [...s];
+}
+function unitPriceFromName(name, price) {
+  const m = /(\d+(?:[.,]\d+)?)\s*(kgs?|grs?|g|lts?|l|ml|cc)\b/i.exec(name || "");
+  if (!m || !price) return null;
+  let qty = parseFloat(m[1].replace(",", ".")), per = "L";
+  const u = m[2].toLowerCase();
+  if (u.startsWith("k")) per = "kg";
+  else if (u.startsWith("g")) { per = "kg"; qty /= 1000; }
+  else if (u === "ml" || u === "cc") qty /= 1000;
+  return qty > 0 ? { value: Math.round((price / qty) * 100) / 100, per } : null;
+}
+function manualOffersFor(ean) {
+  return (manuales[canon(ean)] || []).map((m) => {
+    const unit = Math.round((m.price / m.units) * 100) / 100;   // precio por unidad: es lo que se compara
+    return { store: m.store, price: unit, list_price: unit, in_stock: true, url: null, promo: null, manual: true,
+             ean: canon(ean), date: m.date, pack: { price: m.price, units: m.units }, unit_price: null };
+  });
+}
+function manualNote(o) {
+  const d = o.date ? new Date(o.date + "T00:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
+  return (o.pack.units > 1 ? "Bulto de " + o.pack.units + " a " + money(o.pack.price) : "Precio por unidad") + (d ? ", cargado el " + d : "");
+}
+function withManual(p) {
+  if (!p.ean) return p;
+  const extra = manualOffersFor(p.ean).map((o) => ({ ...o, unit_price: unitPriceFromName(p.name, o.price) }));
+  if (!extra.length) return p;
+  const offers = [...p.offers, ...extra].sort((a, b) => (Number(!a.in_stock) - Number(!b.in_stock)) || a.price - b.price);
+  return { ...p, offers };
+}
+function manualFormHTML(p) {
+  const opts = manualStoreNames().map((s) => '<option value="' + esc(s) + '">' + esc(s) + "</option>").join("");
+  return '<details class="manual"><summary>Cargar precio de Makro, Vital u otra tienda</summary>' +
+    '<form class="mform" data-ean="' + esc(p.ean) + '">' +
+    '<label>Tienda<select name="store">' + opts + '<option value="__otra">Otra tienda…</option></select></label>' +
+    '<label class="other" hidden>Nombre de la tienda<input name="other" maxlength="30" autocomplete="off"></label>' +
+    '<label>Precio<input name="price" inputmode="decimal" placeholder="ej. 7.200" autocomplete="off"></label>' +
+    '<label>Unidades en el bulto<input name="units" inputmode="numeric" value="1" autocomplete="off"></label>' +
+    '<p class="fine">Si el precio es por bulto (por ejemplo, una caja de 6), poné cuántas unidades trae y calculo el precio por unidad.</p>' +
+    '<p class="fine merr" role="alert"></p>' +
+    '<button type="submit" class="btn solid">Guardar precio</button></form></details>';
+}
 
 const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 
@@ -495,7 +568,7 @@ function bestUnit(p) {
   return u.length ? Math.min(...u) : Infinity;
 }
 function view() {
-  let list = data.products.map((p) => ({ ...p, offers: hideOut ? p.offers.filter((o) => o.in_stock) : p.offers })).filter((p) => p.offers.length);
+  let list = data.products.map((p) => withManual({ ...p, offers: hideOut ? p.offers.filter((o) => o.in_stock) : p.offers })).filter((p) => p.offers.length);
   if (sortBy === "price") list.sort((a, b) => (bestOffer(a)?.price ?? Infinity) - (bestOffer(b)?.price ?? Infinity));
   else if (sortBy === "unit") list.sort((a, b) => bestUnit(a) - bestUnit(b));
   return list;
@@ -510,12 +583,14 @@ function offerRow(o, best) {
   const unit = o.unit_price ? money(o.unit_price.value) + " por " + o.unit_price.per : "";
   return '<li class="row' + (o.in_stock ? "" : " out") + '">' +
     '<span class="dot" aria-hidden="true">' + esc(initials(o.store)) + "</span>" +
-    '<div class="who"><a href="' + esc(o.url) + '" target="_blank" rel="noopener">' + esc(o.store) + "</a>" +
+    '<div class="who">' + (o.url ? '<a href="' + esc(o.url) + '" target="_blank" rel="noopener">' + esc(o.store) + "</a>" : "<b>" + esc(o.store) + "</b>") +
+    (o.manual ? '<span class="badge out">cargado por vos</span>' : "") +
     (o.promo ? '<span class="badge promo">' + esc(o.promo) + "</span>" : "") +
     (o.in_stock ? "" : '<span class="badge out">Sin stock</span>') +
-    (unit ? "<small>" + esc(unit) + "</small>" : "") + "</div>" +
+    (unit ? "<small>" + esc(unit) + "</small>" : "") + (o.manual ? "<small>" + esc(manualNote(o)) + "</small>" : "") + "</div>" +
     '<div class="amt"><b>' + (o.list_price > o.price ? "<s>" + money(o.list_price) + "</s>" : "") + money(o.price) + "</b>" +
-    (diff ? "<small>" + diff + "</small>" : "") + "</div></li>";
+    (diff ? "<small>" + diff + "</small>" : "") + "</div>" +
+    (o.manual ? '<button type="button" class="rm" data-delman data-ean="' + esc(o.ean) + '" data-store="' + esc(o.store) + '" aria-label="Borrar el precio cargado de ' + esc(o.store) + '">✕</button>' : "") + "</li>";
 }
 
 const inList = (ean) => ean && myList.some((it) => canon(it.ean) === canon(ean));
@@ -536,12 +611,13 @@ function productHTML(p, idx) {
     const saving = worst && worst !== best ? worst.price - best.price : 0;
     const multi = p.offers.filter((o) => o.in_stock).length > 1;
     // Primero dónde y cuánto sale; la diferencia con las otras tiendas va en segundo lugar.
-    tag = '<div class="best"><div class="bestwhere"><a href="' + esc(best.url) + '" target="_blank" rel="noopener">' + esc(best.store) + "</a>" +
-      '<span class="bestnote">' + (multi ? "precio más bajo" : "solo la encontramos con stock acá") + "</span>" +
+    tag = '<div class="best"><div class="bestwhere">' + (best.url ? '<a href="' + esc(best.url) + '" target="_blank" rel="noopener">' + esc(best.store) + "</a>" : esc(best.store)) +
+      '<span class="bestnote">' + (multi ? "precio más bajo" : "solo la encontramos con stock acá") + (best.manual ? " (cargado por vos)" : "") + "</span>" +
       (best.promo ? '<span class="badge promo">' + esc(best.promo) + "</span>" : "") + "</div>" +
       '<div class="tag" role="img" aria-label="Precio en ' + esc(best.store) + ": " + esc(money(best.price)) + '"><span class="cur">$</span><span class="int">' +
       nf0.format(Math.floor(best.price)) + '</span><span class="cts">' + cents + "</span></div>" +
-      (saving > 0 ? '<div class="best-info"><div class="sub">Ahorrás ' + money(saving) + " frente a " + esc(worst.store) + "</div></div>" : "") + "</div>";
+      (saving > 0 ? '<div class="best-info"><div class="sub">Ahorrás ' + money(saving) + " frente a " + esc(worst.store) + "</div></div>" : "") +
+      (best.manual ? '<div class="bestdel"><button type="button" class="link" data-delman data-ean="' + esc(best.ean) + '" data-store="' + esc(best.store) + '">Quitar el precio cargado de ' + esc(best.store) + "</button></div>" : "") + "</div>";
   }
   const add = p.ean
     ? '<div class="actions"><button type="button" class="btn addlist' + (inList(p.ean) ? " on" : "") + '" data-add="' + idx + '">' +
@@ -551,7 +627,7 @@ function productHTML(p, idx) {
     '<div><div class="name">' + esc(p.name) + "</div>" +
     (p.brand ? '<div class="meta">' + esc(p.brand) + "</div>" : "") +
     (p.ean ? '<div class="meta">Código ' + esc(p.ean) + "</div>" : "") + "</div></div>" +
-    tag + (shown ? '<ul class="rows">' + shown + "</ul>" : "") + more + add + (p.ean ? histHTML(p) : "") + "</section>";
+    tag + (shown ? '<ul class="rows">' + shown + "</ul>" : "") + more + add + (p.ean ? manualFormHTML(p) : "") + (p.ean ? histHTML(p) : "") + "</section>";
 }
 
 function render() {
@@ -595,6 +671,42 @@ $("results").addEventListener("click", (e) => {
   b.textContent = i < 0 ? "En tu lista (tocá para quitar)" : "Agregar a mi lista";
 });
 
+// ---- cargar y borrar precios a mano desde los resultados ----
+$("results").addEventListener("change", (e) => {
+  const sel = e.target.closest('select[name="store"]'); if (!sel) return;
+  const other = sel.closest("form").querySelector(".other");
+  other.hidden = sel.value !== "__otra";
+  if (!other.hidden) other.querySelector("input").focus();
+});
+$("results").addEventListener("submit", (e) => {
+  const f = e.target.closest(".mform"); if (!f) return;
+  e.preventDefault();
+  const err = f.querySelector(".merr");
+  err.classList.remove("bad"); err.textContent = "";
+  const fail = (m) => { err.textContent = m; err.classList.add("bad"); };
+  const v = (n) => f.elements[n].value;
+  const store = (v("store") === "__otra" ? v("other") : v("store")).trim().replace(/\s+/g, " ");
+  const price = parsePrice(v("price"));
+  const units = parseInt(v("units"), 10);
+  if (!store) return fail("Escribí el nombre de la tienda.");
+  if (API_STORES.some((s) => s.toLowerCase() === store.toLowerCase())) return fail(store + " ya se consulta sola, no hace falta cargar su precio.");
+  if (price == null) return fail("Escribí el precio, por ejemplo 7.200.");
+  if (!Number.isInteger(units) || units < 1 || units > 999) return fail("Las unidades del bulto tienen que ser un número entre 1 y 999.");
+  const k = canon(f.dataset.ean);
+  const list = (manuales[k] || []).filter((m) => m.store.toLowerCase() !== store.toLowerCase());
+  list.push({ store, price, units, date: today() });
+  manuales[k] = list; saveManuales();
+  if (data) render();
+});
+$("results").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-delman]"); if (!b) return;
+  const k = canon(b.dataset.ean);
+  manuales[k] = (manuales[k] || []).filter((m) => m.store !== b.dataset.store);
+  if (!manuales[k].length) delete manuales[k];
+  saveManuales();
+  if (data) render();
+});
+
 // ================= mi lista =================
 let checked = {};        // canon(ean) -> {offers:[...in stock...], all:[...]}
 let failedStores = new Set();
@@ -607,11 +719,14 @@ function updateCount() {
   $("cartcount").hidden = !c; $("cartcount").textContent = c;
 }
 
+// Ofertas con stock de las tiendas + precios cargados a mano, de menor a mayor precio por unidad.
+const mergedOffers = (it) => [...((checked[canon(it.ean)] || {}).offers || []), ...manualOffersFor(it.ean)].sort((a, b) => a.price - b.price);
+
 function itemHTML(it) {
   const r = checked[canon(it.ean)];
   let now = "";
   if (r) {
-    const o = r.offers[0];
+    const o = mergedOffers(it)[0];
     now = o ? 'Mejor hoy: <b>' + money(o.price) + "</b> en " + esc(o.store) : "Sin stock en ninguna tienda";
   }
   return '<div class="item" data-k="' + esc(canon(it.ean)) + '">' +
@@ -622,7 +737,7 @@ function itemHTML(it) {
 }
 
 function planFor() {
-  const rows = myList.map((it) => ({ it, offers: ((checked[canon(it.ean)] || {}).offers || []) }));
+  const rows = myList.map((it) => ({ it, offers: mergedOffers(it) }));
   const needed = rows.filter((r) => r.offers.length);
   const names = [...new Set(needed.flatMap((r) => r.offers.map((o) => o.store)))].filter((s) => !failedStores.has(s));
   const totals = names.map((s) => {
@@ -638,7 +753,7 @@ function planFor() {
     const pool = r.offers.filter((o) => !failedStores.has(o.store));
     const o = (pool.length ? pool : r.offers)[0];   // las ofertas ya vienen ordenadas por precio
     (stops[o.store] = stops[o.store] || { items: [], sub: 0 });
-    stops[o.store].items.push({ it: r.it, price: o.price });
+    stops[o.store].items.push({ it: r.it, price: o.price, pack: o.manual ? o.pack : null, manual: !!o.manual });
     stops[o.store].sub += o.price * r.it.qty;
     splitTotal += o.price * r.it.qty;
   });
@@ -657,7 +772,7 @@ function summaryHTML() {
   html += "</div>";
   stopNames.forEach((s) => {
     html += '<div class="stop"><div class="h"><span>' + esc(s) + "</span><span>" + money(pl.stops[s].sub) + "</span></div><ul>" +
-      pl.stops[s].items.map((x) => "<li><span>" + (x.it.qty > 1 ? x.it.qty + " × " : "") + esc(x.it.name) + "</span><span>" + money(x.price * x.it.qty) + "</span></li>").join("") + "</ul></div>";
+      pl.stops[s].items.map((x) => "<li><span>" + (x.it.qty > 1 ? x.it.qty + " × " : "") + esc(x.it.name) + (x.pack && x.pack.units > 1 ? " <small>(bulto de " + x.pack.units + ")</small>" : "") + "</span><span>" + money(x.price * x.it.qty) + "</span></li>").join("") + "</ul></div>";
   });
   html += "</div>";
 
@@ -674,6 +789,7 @@ function summaryHTML() {
   const notes = [];
   if (pl.noStock.length) notes.push("Sin stock en ninguna tienda: " + pl.noStock.map((r) => esc(r.it.name)).join(", ") + ".");
   if (failedStores.size) notes.push("No se pudo consultar " + [...failedStores].map(esc).join(", ") + " en esta revisión; esas tiendas no entran en las comparaciones.");
+  if (Object.values(pl.stops).some((s) => s.items.some((x) => x.manual))) notes.push("Los precios cargados por vos están calculados por unidad; en un mayorista hay que comprar el bulto entero.");
   notes.push("No incluye envío. Los precios pueden cambiar según la sucursal.");
   return html + '<p class="fine">' + notes.join(" ") + "</p>";
 }
@@ -747,7 +863,7 @@ $("check").addEventListener("click", async () => {
 
 // ---- copia de seguridad ----
 $("export").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify({ version: 1, lista: myList, historial: history })], { type: "application/json" });
+  const blob = new Blob([JSON.stringify({ version: 2, lista: myList, historial: history, manuales })], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = "comparador-copia-" + today() + ".json";
   document.body.appendChild(a); a.click(); a.remove();
@@ -762,7 +878,8 @@ $("file").addEventListener("change", async (e) => {
     if (!Array.isArray(d.lista) || typeof d.historial !== "object") throw new Error();
     myList = d.lista.filter((x) => x && x.ean && x.name).map((x) => ({ ean: String(x.ean), name: String(x.name), brand: String(x.brand || ""), image: String(x.image || ""), qty: Math.min(99, Math.max(1, Number(x.qty) || 1)) }));
     history = d.historial;
-    save("lista-v1", myList); save("historial-v1", history);
+    manuales = sanitizeManuales(d.manuales);   // copias viejas no traen precios cargados: queda vacío
+    save("lista-v1", myList); save("historial-v1", history); saveManuales();
     checked = {}; renderList();
     $("lstatus").className = "status"; $("lstatus").textContent = "Copia cargada: " + myList.length + " productos en tu lista.";
   } catch (_) {
@@ -771,14 +888,16 @@ $("file").addEventListener("change", async (e) => {
 });
 
 // ================= carrito (compra en el súper) =================
-const STORE_NAMES = ["Coto", "Carrefour", "Jumbo", "Disco", "Vea", "Día", "ChangoMás", "Toledo"];
+// Las ocho tiendas que se consultan solas más las cargadas a mano (Makro, Vital y las que agregues).
+const storeNames = () => [...API_STORES, ...manualStoreNames().filter((s) => !API_STORES.includes(s))];
 let cart = load("carrito-v1", null);
 if (!cart || !Array.isArray(cart.items)) cart = { store: "Coto", items: [] };
-if (!STORE_NAMES.includes(cart.store)) cart.store = "Coto";
+if (!storeNames().includes(cart.store)) cart.store = "Coto";
 cart.items.forEach((it) => { if (it.loading || it.name === "Buscando…") { it.loading = false; it.name = "Producto " + it.ean + " (sin datos)"; } });
 const saveCart = () => save("carrito-v1", cart);
 const isCode = (s) => /^\d+$/.test(s) && [8, 12, 13, 14].includes(s.length);
-const offerFor = (it, store) => (it.offers || []).find((o) => o.store === store && o.in_stock) || null;
+const offersOf = (it) => [...(it.offers || []), ...manualOffersFor(it.ean)];
+const offerFor = (it, store) => offersOf(it).find((o) => o.store === store && o.in_stock) || null;
 // Un precio escrito a mano vale solo para la tienda donde se escribió.
 const isManual = (it) => it.manual && it.manualStore === cart.store;
 function priceOf(it) {
@@ -853,15 +972,15 @@ function cartItemHTML(it) {
     '<label class="pr"><span aria-hidden="true">$</span><input class="priceinp" inputmode="decimal" placeholder="precio" aria-label="Precio de una unidad" value="' +
     (p != null ? String(p).replace(".", ",") : "") + '"></label>' +
     (it.qty > 1 && sub != null ? '<span class="sub-total">Subtotal ' + money(sub) + "</span>" : "") +
-    (isManual(it) ? '<span class="badge out">a mano</span>' : "") + promo + "</div></div>" +
+    (isManual(it) ? '<span class="badge out">a mano</span>' : o && o.manual ? '<span class="badge out">cargado por vos</span>' : "") + promo + "</div></div>" +
     '<div class="qty"><button type="button" data-q="-1" aria-label="Menos unidades">−</button><span aria-live="polite">' + it.qty + '</span><button type="button" data-q="1" aria-label="Más unidades">+</button></div>' +
     '<button type="button" class="rm" data-rm aria-label="Sacar del carrito">✕</button></div>';
 }
 
 function cartCompareHTML() {
-  const need = cart.items.filter((it) => !it.loading && (it.offers || []).some((o) => o.in_stock));
+  const need = cart.items.filter((it) => !it.loading && offersOf(it).some((o) => o.in_stock));
   if (!need.length) return "";
-  const names = [...new Set(need.flatMap((it) => it.offers.filter((o) => o.in_stock).map((o) => o.store)))];
+  const names = [...new Set(need.flatMap((it) => offersOf(it).filter((o) => o.in_stock).map((o) => o.store)))];
   const rows = names.map((s) => {
     let total = 0, missing = 0;
     need.forEach((it) => { const o = offerFor(it, s); if (o) total += o.price * it.qty; else missing++; });
@@ -882,7 +1001,8 @@ function cartCompareHTML() {
 
 function renderCart() {
   const sel = $("cstore");
-  if (!sel.options.length) sel.innerHTML = STORE_NAMES.map((s) => '<option value="' + esc(s) + '">' + esc(s) + "</option>").join("");
+  const names = storeNames();
+  if ([...sel.options].map((o) => o.value).join("|") !== names.join("|")) sel.innerHTML = names.map((s) => '<option value="' + esc(s) + '">' + esc(s) + "</option>").join("");
   sel.value = cart.store;
   updateCount();
   const box = $("citems");

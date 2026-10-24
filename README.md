@@ -3,6 +3,23 @@
 Busca un producto en Carrefour, Jumbo, Disco, Vea, Día, ChangoMás, Toledo y Coto a la vez y
 muestra cuál lo tiene más barato. Funciona por **código de barras (EAN)** o por **nombre**.
 
+## Makro, Vital y otras tiendas sin catálogo online (precios cargados a mano)
+
+Makro y Vital no tienen un catálogo con precios que la app pueda leer sola, así que los cargás vos:
+
+1. Buscá el producto y, en su tarjeta, abrí **"Cargar precio de Makro, Vital u otra tienda"**.
+2. Elegí la tienda (o "Otra tienda…" para escribir otra), el precio y **cuántas unidades trae el bulto**.
+   Por ejemplo, una caja de 6 a $7.200 se carga como precio 7.200 y 6 unidades: la app calcula $1.200 por unidad.
+3. Ese precio aparece en la comparación marcado como "cargado por vos", con la fecha. Se borra con la ✕
+   (o con "Quitar el precio cargado" si es el más barato).
+
+También cuenta en **Mi lista** (se suma al total y a "repartir la compra", con la nota "bulto de N") y en
+**Carrito** (Makro y Vital aparecen como tiendas para elegir). Se guardan en el teléfono y van incluidos en
+la copia de seguridad.
+
+Ojo: en un mayorista hay que comprar el bulto entero, y el precio puede cambiar según la sucursal. La app no
+se entera cuando cambia: el precio queda con la fecha en que lo cargaste.
+
 ## Carrito: cuánto estoy pagando en el súper
 
 En la pestaña **Carrito**:
