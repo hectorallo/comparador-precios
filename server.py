@@ -51,7 +51,7 @@ COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
-VERSION = "2026-10-24-h"
+VERSION = "2026-10-24-i"
 
 TIMEOUT = 10          # segundos por tienda
 CACHE_TTL = 600       # 10 minutos
@@ -175,14 +175,45 @@ def parse_products(store, base, data, wanted_ean=None):
     return out
 
 
-def fetch_store(store, base, q, by_ean):
+def _vtex_get(base, params, path_term=None):
     url = f"{base}/api/catalog_system/pub/products/search"
+    if path_term:
+        url += "/" + quote(path_term, safe="")
+    return SESSION.get(url, params=params, timeout=TIMEOUT)
+
+
+def _reason(r):
+    """Motivo del error que informa la tienda, en una línea corta."""
+    try:
+        j = r.json()
+        msg = (j.get("message") or j.get("Message") or j.get("error") or r.text) if isinstance(j, dict) else r.text
+    except ValueError:
+        msg = r.text
+    return " ".join(str(msg).split())[:90]
+
+
+def _vtex_try(base, attempts):
+    """Prueba distintas formas de hacer el mismo pedido; si todas fallan, informa el motivo."""
+    first = None
+    for params, term in attempts:
+        r = _vtex_get(base, params, term)
+        if r.status_code in (200, 206):
+            return r.json()
+        if first is None:
+            first = f"la tienda respondió con error {r.status_code}: {_reason(r)}"
+        if r.status_code != 400:
+            break
+    raise RuntimeError(first)
+
+
+def _name_attempts(q):
+    rng = {"_from": 0, "_to": MAX_PER_STORE - 1}
+    return [({"ft": q, **rng}, None), ({"ft": q}, None), (rng, q)]
+
+
+def fetch_store(store, base, q, by_ean):
     if not by_ean:
-        params = {"ft": q, "_from": 0, "_to": MAX_PER_STORE - 1}
-        r = SESSION.get(url, params=params, timeout=TIMEOUT)
-        if r.status_code not in (200, 206):
-            raise RuntimeError(f"la tienda respondió con error {r.status_code}")
-        return parse_products(store, base, r.json(), None)
+        return parse_products(store, base, _vtex_try(base, _name_attempts(q)), None)
     # El mismo producto puede estar cargado como GTIN-14 (con un 0 adelante),
     # EAN-13 o UPC-12: se prueban las variantes hasta encontrarlo.
     variants = [q]
@@ -191,10 +222,8 @@ def fetch_store(store, base, q, by_ean):
     if len(q) == 12:
         variants.append("0" + q)
     for v in variants:
-        r = SESSION.get(url, params={"fq": f"alternateIds_Ean:{v}"}, timeout=TIMEOUT)
-        if r.status_code not in (200, 206):
-            raise RuntimeError(f"la tienda respondió con error {r.status_code}")
-        found = parse_products(store, base, r.json(), q)
+        data = _vtex_try(base, [({"fq": f"alternateIds_Ean:{v}"}, None), ({"ft": v}, None)])
+        found = parse_products(store, base, data, q)
         if found:
             return found
     return []
@@ -400,6 +429,27 @@ def api_search():
 def api_version():
     """Sirve para comprobar qué versión del programa está publicada."""
     return jsonify(version=VERSION, coto_key_cargada=bool(COTO_KEY))
+
+
+@app.get("/api/debug/tienda")
+def api_debug_tienda():
+    """Muestra qué responde una tienda VTEX a cada forma de pedido. Solo con DEBUG_COTO=1."""
+    if os.environ.get("DEBUG_COTO") != "1":
+        return jsonify(error="desactivado"), 404
+    store = request.args.get("store", "Jumbo")
+    q = request.args.get("q", "leche")
+    base = STORES.get(store)
+    if not base:
+        return Response("Tiendas: " + ", ".join(STORES), status=400, mimetype="text/plain; charset=utf-8")
+    lines = [f"Tienda: {store} | búsqueda: {q}", ""]
+    for params, term in _name_attempts(q):
+        try:
+            r = _vtex_get(base, params, term)
+            lines.append(f"{r.status_code} {r.url}")
+            lines.append("   " + " ".join(r.text.split())[:240])
+        except Exception as e:
+            lines.append(f"ERROR de conexión: {e}")
+    return Response("\n".join(lines), mimetype="text/plain; charset=utf-8")
 
 
 @app.get("/api/debug/coto")
