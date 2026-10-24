@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import requests
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 # ---------- configuración ----------
 
@@ -51,7 +51,7 @@ COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
-VERSION = "2026-10-24-f"
+VERSION = "2026-10-24-g"
 
 TIMEOUT = 10          # segundos por tienda
 CACHE_TTL = 600       # 10 minutos
@@ -237,7 +237,9 @@ def _coto_price(data):
     entries = [e for e in _as_list(data.get("price")) if isinstance(e, dict)]
     chosen = next((e for e in entries if str(e.get("store")) == COTO_STORE_ID), None)
     if chosen is None and entries:
-        chosen = entries[0]
+        # Hay precios, pero ninguno de la sucursal de referencia: el producto no se vende ahí.
+        # No se usa el precio de otra sucursal (puede ser de otra región o estar desactualizado).
+        return None
     if chosen:
         for k in ("listPrice", "list_price", "price_list"):
             v = _num(chosen.get(k))
@@ -398,26 +400,27 @@ def api_debug_coto():
         return jsonify(error="desactivado"), 404
     q = request.args.get("q", "leche")
     try:
-        raw = _coto_request(q, 3)
+        raw = _coto_request(q, 12)
     except Exception as e:
-        return jsonify(error=str(e)), 502
-    out = []
-    for it in raw[:3]:
+        return Response("Error: " + str(e), status=502, mimetype="text/plain; charset=utf-8")
+    lines = [f"Búsqueda: {q} | sucursal de referencia: {COTO_STORE_ID} | resultados: {len(raw)}", ""]
+    for it in raw[:12]:
         d = it.get("data") or {}
-        out.append({
+        entries = [e for e in _as_list(d.get("price")) if isinstance(e, dict)]
+        mine = next((e for e in entries if str(e.get("store")) == COTO_STORE_ID), None)
+        lines.append(json.dumps({
             "nombre": it.get("value"),
             "ean": d.get("product_main_ean"),
-            "precio_que_usa_la_app": _coto_price(d),
-            "price_crudo": d.get("price"),
-            "product_list_price": d.get("product_list_price"),
-            "discounts": d.get("discounts"),
-            "product_format": d.get("product_format"),
-            "product_format_quantity": d.get("product_format_quantity"),
-            "product_unit_of_measure": d.get("product_unit_of_measure"),
-            "sucursal_usada": COTO_STORE_ID,
-            "campos_disponibles": sorted(d.keys()),
-        })
-    return jsonify(resultados=out)
+            "precio_app": _coto_price(d),
+            "en_sucursal": ({k: mine.get(k) for k in ("listPrice", "formatPrice", "priceWithoutTax")}
+                            if mine else "NO ESTÁ EN ESA SUCURSAL"),
+            "precios_distintos": sorted({e.get("listPrice") for e in entries if e.get("listPrice") is not None}, key=str),
+            "stock_app": _coto_available(d),
+            "stock_crudo": str(d.get("store_availability"))[:120],
+            "formato": [d.get("product_format"), d.get("product_format_quantity"), d.get("product_unit_of_measure")],
+            "descuentos": d.get("discounts"),
+        }, ensure_ascii=False))
+    return Response("\n".join(lines), mimetype="text/plain; charset=utf-8")
 
 
 @app.get("/")
