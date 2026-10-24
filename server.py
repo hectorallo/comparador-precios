@@ -46,12 +46,12 @@ def _clean_key(raw):
 
 
 COTO_KEY = _clean_key(os.environ.get("COTO_KEY"))
-COTO_STORE_ID = os.environ.get("COTO_STORE_ID", "200").strip()  # sucursal de referencia
+COTO_STORE_ID = os.environ.get("COTO_STORE_ID", "238").strip()  # sucursal de referencia (238 = Mar del Plata)
 COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
-VERSION = "2026-10-24-g"
+VERSION = "2026-10-24-h"
 
 TIMEOUT = 10          # segundos por tienda
 CACHE_TTL = 600       # 10 minutos
@@ -249,13 +249,22 @@ def _coto_price(data):
 
 
 def _coto_available(data):
+    """Coto informa la lista de sucursales donde hay stock. Lista vacía = producto
+    descontinuado (sigue en el catálogo con un precio viejo): no está disponible."""
     val = data.get("store_availability")
+    if val is None:
+        return True  # sin dato: asumimos disponible
     if isinstance(val, bool):
         return val
-    val = _as_list(val) if not isinstance(val, list) else val
-    if val:
-        return COTO_STORE_ID in json.dumps(val)
-    return True  # sin dato: asumimos disponible
+    if isinstance(val, str):
+        try:
+            val = json.loads(val)
+        except ValueError:
+            pass  # texto suelto, se busca la sucursal dentro del texto
+    text = val if isinstance(val, str) else json.dumps(val)
+    if text.strip() in ("", "[]", "{}", "null"):
+        return False
+    return re.search(r"(?<!\d)" + re.escape(COTO_STORE_ID) + r"(?!\d)", text) is not None
 
 
 def _coto_promo(data):

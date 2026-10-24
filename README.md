@@ -116,7 +116,8 @@ Cargala como variable de entorno llamada `COTO_KEY`:
 Sin la clave, el resto de las tiendas funciona igual y Coto aparece como "Sin datos" con el motivo.
 
 Opcional: `COTO_STORE_ID` cambia la sucursal de referencia para los precios de Coto
-(por defecto `200`).
+(por defecto `238`, la de Mar del Plata). Los productos que Coto ya no vende
+(descontinuados, con precio viejo) se marcan "Sin stock" y no cuentan como el más barato.
 
 **Si Coto responde pero no aparecen precios o aparecen mal:** activá `DEBUG_COTO=1`,
 abrí `/api/debug/coto?q=leche` y mandame lo que muestra para ajustar la lectura.
