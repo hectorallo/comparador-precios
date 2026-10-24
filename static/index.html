@@ -37,6 +37,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--paper); color: var(--ink);
@@ -45,12 +46,18 @@
   }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   main { max-width: 720px; margin: 0 auto; padding: 18px 16px 56px; }
+  button { font-family: var(--font); }
 
-  /* ---- encabezado y búsqueda ---- */
+  /* ---- encabezado y pestañas ---- */
   .brand { display: flex; align-items: center; gap: 10px; margin: 2px 0 14px; }
   .brand svg { width: 34px; height: 34px; flex: none; }
   .brand b { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 2px solid var(--ink); border-radius: 12px; overflow: hidden; margin-bottom: 14px; background: var(--card); }
+  .tabs button { border: 0; background: transparent; color: var(--ink); padding: 11px 8px; font: 700 1rem var(--font); cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
+  .count { display: inline-block; min-width: 22px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--tag); color: var(--tag-ink); font-size: .8125rem; line-height: 22px; }
 
+  /* ---- búsqueda ---- */
   .search {
     display: flex; align-items: stretch; background: var(--card);
     border: 2px solid var(--ink); border-radius: 14px; overflow: hidden;
@@ -77,6 +84,9 @@
     border-radius: 999px; padding: 8px 14px; font: 500 0.9375rem var(--font); cursor: pointer;
   }
   .chip:hover { border-color: var(--ink); }
+  .btn { border: 2px solid var(--ink); background: var(--card); color: var(--ink); border-radius: 10px; padding: 9px 14px; font: 700 .9375rem var(--font); cursor: pointer; }
+  .btn.solid { background: var(--ink); color: var(--paper); }
+  .btn:disabled { opacity: .55; cursor: default; }
 
   /* ---- escáner ---- */
   #scanner { display: none; margin-top: 14px; }
@@ -88,15 +98,12 @@
   }
   #scanner p { margin: 8px 2px; color: var(--muted); font-size: .9375rem; }
 
-  /* ---- barra de estado y orden ---- */
-  #status { margin: 20px 2px 0; color: var(--muted); font-size: .9375rem; }
-  #status.warn { color: var(--promo); }
+  /* ---- estado y orden ---- */
+  .status { margin: 20px 2px 0; color: var(--muted); font-size: .9375rem; }
+  .status.warn { color: var(--promo); }
   .controls { display: none; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0 4px; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
-  .seg button {
-    border: 0; background: transparent; color: var(--muted); padding: 9px 12px; cursor: pointer;
-    font: 600 .875rem var(--font);
-  }
+  .seg button { border: 0; background: transparent; color: var(--muted); padding: 9px 12px; cursor: pointer; font: 600 .875rem var(--font); }
   .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .switch { display: inline-flex; align-items: center; gap: 8px; font-size: .9375rem; cursor: pointer; }
   .switch input { width: 20px; height: 20px; accent-color: var(--ink); }
@@ -129,10 +136,7 @@
   .rows { list-style: none; margin: 10px 0 0; padding: 0; }
   .row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
   .row.out { opacity: .6; }
-  .dot {
-    flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--line);
-    display: grid; place-items: center; font-weight: 800; font-size: .8125rem;
-  }
+  .dot { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--line); display: grid; place-items: center; font-weight: 800; font-size: .8125rem; }
   .who { flex: 1; min-width: 0; }
   .who a { font-weight: 600; color: inherit; text-decoration: none; }
   .who a:hover { text-decoration: underline; }
@@ -145,7 +149,58 @@
   .amt b { display: block; font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
   .amt s { color: var(--muted); font-size: .8125rem; margin-right: 6px; }
   .amt small { color: var(--muted); font-size: .8125rem; }
-  details.more summary { cursor: pointer; padding: 10px 0 2px; color: var(--muted); font-weight: 600; font-size: .9375rem; }
+  details.more summary, details.hist summary { cursor: pointer; padding: 10px 0 2px; color: var(--muted); font-weight: 600; font-size: .9375rem; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .addlist { flex: 1; }
+  .addlist.on { background: var(--good); border-color: var(--good); color: #fff; }
+  @media (prefers-color-scheme: dark) { .addlist.on { color: #07261a; } }
+
+  /* ---- historial ---- */
+  .hist-body { padding-top: 6px; }
+  .verdict { font-weight: 700; margin: 4px 0 8px; }
+  .verdict.good { color: var(--good); }
+  .verdict.bad { color: var(--promo); }
+  .spark { width: 100%; height: 96px; display: block; }
+  .spark .axis { stroke: var(--line); stroke-width: 1; }
+  .spark .line { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .spark .dotc { fill: var(--tag); stroke: var(--ink); stroke-width: 2; }
+  .spark text { fill: var(--muted); font: 600 11px var(--font); }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; font-size: .875rem; color: var(--muted); margin-top: 6px; }
+  .stats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .fine { color: var(--muted); font-size: .8125rem; margin: 8px 0 0; }
+
+  /* ---- mi lista ---- */
+  .listhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .listhead h2 { margin: 0; font-size: 1.25rem; letter-spacing: -0.01em; }
+  .item { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; margin-top: 10px; }
+  .item img, .item .ph { width: 52px; height: 52px; flex: none; border-radius: 8px; background: #fff; object-fit: contain; }
+  .item .ph { background: var(--line); }
+  .item .info { flex: 1; min-width: 0; }
+  .item .info .name { font-size: .9375rem; }
+  .item .now { font-size: .8125rem; color: var(--muted); margin-top: 2px; }
+  .item .now b { color: var(--ink); }
+  .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex: none; }
+  .qty button { width: 34px; height: 36px; border: 0; background: transparent; color: var(--ink); font-size: 1.25rem; cursor: pointer; }
+  .qty span { min-width: 24px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rm { border: 0; background: transparent; color: var(--muted); font-size: 1.125rem; cursor: pointer; padding: 6px; flex: none; }
+  .summary { margin-top: 18px; }
+  .summary h3 { margin: 0 0 8px; font-size: 1.0625rem; }
+  .plan { background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 14px; }
+  .plan .big { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .plan .big b { font-size: 2rem; font-weight: 850; font-stretch: 80%; font-variant-numeric: tabular-nums; }
+  .plan .good { color: var(--good); font-weight: 700; }
+  .stop { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .stop .h { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; }
+  .stop ul { list-style: none; padding: 0; margin: 6px 0 0; color: var(--muted); font-size: .9375rem; }
+  .stop li { display: flex; justify-content: space-between; gap: 10px; }
+  .totals { margin-top: 14px; }
+  .totals .row b { font-variant-numeric: tabular-nums; }
+  .backup { margin-top: 24px; font-size: .9375rem; color: var(--muted); }
+  .backup summary { cursor: pointer; font-weight: 600; }
+  .backup .actions { margin-top: 10px; }
+  .progress { height: 8px; border-radius: 6px; background: var(--line); overflow: hidden; margin-top: 10px; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--ink); transition: width .2s; }
+  @media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
 
   /* ---- vacío, carga y errores ---- */
   .empty { text-align: center; padding: 36px 8px 8px; }
@@ -168,36 +223,65 @@
     <b>Comparador de precios</b>
   </div>
 
-  <form id="form" class="search" role="search">
-    <input id="q" type="search" placeholder="Producto o código" autocomplete="off" enterkeyhint="search" aria-label="Producto o código de barras">
-    <button type="button" class="scan" id="scan" aria-label="Escanear código de barras">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 9v6M10 9v6M13 9v6M17 9v6"/></svg>
-      <span>Escanear</span>
-    </button>
-    <button type="submit" class="go" id="go">Buscar</button>
-  </form>
-
-  <ul class="chips" id="chips"></ul>
-
-  <div id="scanner">
-    <div class="viewfinder"><video id="video" playsinline muted></video></div>
-    <p id="scanmsg">Apuntá la cámara al código de barras del producto.</p>
-    <button type="button" class="chip" id="stop">Cerrar cámara</button>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-search" aria-selected="true" aria-controls="view-search">Buscar</button>
+    <button type="button" role="tab" id="tab-list" aria-selected="false" aria-controls="view-list">Mi lista<span class="count" id="listcount" hidden>0</span></button>
   </div>
 
-  <div id="status" role="status" aria-live="polite"></div>
+  <!-- ===== Buscar ===== -->
+  <section id="view-search" role="tabpanel" aria-labelledby="tab-search">
+    <form id="form" class="search" role="search">
+      <input id="q" type="search" placeholder="Producto o código" autocomplete="off" enterkeyhint="search" aria-label="Producto o código de barras">
+      <button type="button" class="scan" id="scan" aria-label="Escanear código de barras">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 9v6M10 9v6M13 9v6M17 9v6"/></svg>
+        <span>Escanear</span>
+      </button>
+      <button type="submit" class="go" id="go">Buscar</button>
+    </form>
+    <ul class="chips" id="chips"></ul>
 
-  <div class="controls" id="controls">
-    <div class="seg" role="group" aria-label="Ordenar resultados">
-      <button type="button" data-sort="stores" aria-pressed="true">Más tiendas</button>
-      <button type="button" data-sort="price" aria-pressed="false">Menor precio</button>
-      <button type="button" data-sort="unit" aria-pressed="false">Por kg o litro</button>
+    <div id="scanner">
+      <div class="viewfinder"><video id="video" playsinline muted></video></div>
+      <p id="scanmsg">Apuntá la cámara al código de barras del producto.</p>
+      <button type="button" class="chip" id="stop">Cerrar cámara</button>
     </div>
-    <label class="switch"><input type="checkbox" id="hideOut"> Ocultar sin stock</label>
-  </div>
 
-  <div id="results"></div>
-  <details class="stores" id="stores" hidden></details>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <div class="controls" id="controls">
+      <div class="seg" role="group" aria-label="Ordenar resultados">
+        <button type="button" data-sort="stores" aria-pressed="true">Más tiendas</button>
+        <button type="button" data-sort="price" aria-pressed="false">Menor precio</button>
+        <button type="button" data-sort="unit" aria-pressed="false">Por kg o litro</button>
+      </div>
+      <label class="switch"><input type="checkbox" id="hideOut"> Ocultar sin stock</label>
+    </div>
+
+    <div id="results"></div>
+    <details class="stores" id="stores" hidden></details>
+  </section>
+
+  <!-- ===== Mi lista ===== -->
+  <section id="view-list" role="tabpanel" aria-labelledby="tab-list" hidden>
+    <div class="listhead">
+      <h2>Mi lista de compras</h2>
+      <button type="button" class="btn solid" id="check">Revisar precios</button>
+    </div>
+    <div id="lstatus" class="status" role="status" aria-live="polite"></div>
+    <div class="progress" id="progress" hidden><i></i></div>
+    <div id="items"></div>
+    <div id="summary" class="summary"></div>
+
+    <details class="backup">
+      <summary>Copia de seguridad</summary>
+      <p class="fine">La lista y el historial se guardan solo en este teléfono. Si borrás los datos del navegador se pierden; guardá una copia de vez en cuando.</p>
+      <div class="actions">
+        <button type="button" class="btn" id="export">Guardar copia</button>
+        <button type="button" class="btn" id="import">Cargar copia</button>
+        <input type="file" id="file" accept="application/json,.json" hidden>
+      </div>
+    </details>
+  </section>
 </main>
 
 <script>
@@ -207,41 +291,129 @@ const nf0 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
 const nf2 = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money = (n) => "$ " + (Number.isInteger(n) ? nf0.format(n) : nf2.format(n));
 const initials = (s) => s.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, "").slice(0, 2);
+const canon = (e) => String(e || "").replace(/^0+/, "");
 
-const EXAMPLES = ["leche entera", "yerba mate", "aceite de girasol", "fideos tirabuzón", "arroz largo fino"];
-let data = null, sortBy = "stores", hideOut = false;
+// ================= almacenamiento en el teléfono =================
+// Si el navegador no deja guardar, la app sigue andando, pero sin recordar nada.
+function load(key, fallback) { try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; } catch (_) { return fallback; } }
+function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (_) { return false; } }
 
-// ---- búsquedas recientes (solo comodidad; si el navegador no deja guardar, no pasa nada) ----
-function recents() { try { return JSON.parse(localStorage.getItem("recientes") || "[]"); } catch (_) { return []; } }
-function remember(q) {
-  try {
-    const list = [q, ...recents().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 6);
-    localStorage.setItem("recientes", JSON.stringify(list));
-  } catch (_) {}
+let myList = load("lista-v1", []);       // [{ean, name, brand, image, qty}]
+let history = load("historial-v1", {});   // { eanSinCeros: {name, seen, pts:[{d, p:{tienda: precio}}]} }
+
+const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+
+function record(products) {
+  const t = today();
+  for (const p of products) {
+    if (!p.ean) continue;
+    const prices = {};
+    p.offers.forEach((o) => { if (o.in_stock) prices[o.store] = o.price; });
+    if (!Object.keys(prices).length) continue;
+    const k = canon(p.ean);
+    const e = history[k] || { name: p.name, pts: [] };
+    e.name = p.name; e.seen = Date.now();
+    const last = e.pts[e.pts.length - 1];
+    if (last && last.d === t) last.p = { ...last.p, ...prices }; else e.pts.push({ d: t, p: prices });
+    if (e.pts.length > 180) e.pts = e.pts.slice(-180);
+    history[k] = e;
+  }
+  const keys = Object.keys(history);
+  if (keys.length > 500) keys.sort((a, b) => history[a].seen - history[b].seen).slice(0, keys.length - 500).forEach((k) => delete history[k]);
+  save("historial-v1", history);
 }
-function forget() { try { localStorage.removeItem("recientes"); } catch (_) {} renderChips(); }
+
+function sparkHTML(pts) {
+  // "T00:00:00" sin zona = medianoche local; sin eso el navegador lo toma como UTC y corre el día
+  const series = pts.map((pt) => ({ t: Date.parse(pt.d + "T00:00:00"), v: Math.min(...Object.values(pt.p)) }));
+  const vs = series.map((s) => s.v), lo = Math.min(...vs), hi = Math.max(...vs);
+  const t0 = series[0].t, t1 = series[series.length - 1].t;
+  const W = 300, H = 96, L = 8, R = 8, T = 16, B = 18;
+  const x = (t) => (t1 === t0 ? W / 2 : L + ((t - t0) / (t1 - t0)) * (W - L - R));
+  const y = (v) => (hi === lo ? H / 2 : T + (1 - (v - lo) / (hi - lo)) * (H - T - B));
+  const line = series.map((s) => x(s.t).toFixed(1) + "," + y(s.v).toFixed(1)).join(" ");
+  const last = series[series.length - 1];
+  const fmt = (d) => new Date(d).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+  return '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Evolución del menor precio">' +
+    '<line class="axis" x1="' + L + '" x2="' + (W - R) + '" y1="' + (H - B) + '" y2="' + (H - B) + '"/>' +
+    '<polyline class="line" points="' + line + '"/>' +
+    '<circle class="dotc" cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="5"/>' +
+    '<text x="' + L + '" y="' + (H - 4) + '">' + fmt(t0) + '</text>' +
+    '<text x="' + (W - R) + '" y="' + (H - 4) + '" text-anchor="end">' + fmt(t1) + "</text></svg>";
+}
+
+function histHTML(p) {
+  const e = p.ean && history[canon(p.ean)];
+  if (!e || e.pts.length < 2) {
+    return '<details class="hist"><summary>Historial de precios</summary><div class="hist-body"><p class="fine">Todavía hay un solo día guardado. Volvé a buscar este producto otro día y acá vas a ver si sube o baja.</p></div></details>';
+  }
+  const bests = e.pts.map((pt) => Math.min(...Object.values(pt.p)));
+  const cur = bests[bests.length - 1], min = Math.min(...bests), avg = bests.reduce((a, b) => a + b, 0) / bests.length;
+  let verdict = "Está en un precio parecido al de siempre", cls = "";
+  if (e.pts.length >= 3) {
+    if (cur <= min * 1.005) { verdict = "Es el precio más bajo que registramos"; cls = "good"; }
+    else if (cur < avg * 0.97) { verdict = "Está más barato que lo habitual"; cls = "good"; }
+    else if (cur > avg * 1.03) { verdict = "Está más caro que lo habitual"; cls = "bad"; }
+  } else {
+    const prev = bests[bests.length - 2];
+    if (cur < prev) { verdict = "Bajó desde la última vez"; cls = "good"; }
+    else if (cur > prev) { verdict = "Subió desde la última vez"; cls = "bad"; }
+    else verdict = "Sigue igual que la última vez";
+  }
+  return '<details class="hist"><summary>Historial de precios</summary><div class="hist-body">' +
+    '<div class="verdict ' + cls + '">' + verdict + "</div>" + sparkHTML(e.pts) +
+    '<div class="stats"><span>Hoy <b>' + money(cur) + '</b></span><span>Mínimo <b>' + money(min) + '</b></span><span>Promedio <b>' + money(avg) + "</b></span></div>" +
+    '<p class="fine">Es el menor precio con stock de cada día, según las veces que lo buscaste desde este teléfono (' + e.pts.length + " días).</p></div></details>";
+}
+
+// ================= pestañas =================
+function showTab(name) {
+  const isList = name === "list";
+  $("view-search").hidden = isList; $("view-list").hidden = !isList;
+  $("tab-search").setAttribute("aria-selected", String(!isList));
+  $("tab-list").setAttribute("aria-selected", String(isList));
+  if (isList) renderList();
+}
+$("tab-search").addEventListener("click", () => showTab("search"));
+$("tab-list").addEventListener("click", () => showTab("list"));
+
+// ================= buscar =================
+const EXAMPLES = ["leche entera", "yerba mate", "aceite de girasol", "fideos tirabuzón", "arroz largo fino"];
+let data = null, sortBy = "stores", hideOut = false, viewProducts = [];
+
 function renderChips() {
-  const r = recents();
+  const r = load("recientes", []);
   const items = r.length ? r : EXAMPLES;
   $("chips").innerHTML = items.map((t) => '<li><button type="button" class="chip" data-q="' + esc(t) + '">' + esc(t) + "</button></li>").join("") +
     (r.length ? '<li><button type="button" class="link" id="clear">Borrar recientes</button></li>' : "");
-  const clear = $("clear"); if (clear) clear.addEventListener("click", forget);
+  const clear = $("clear");
+  if (clear) clear.addEventListener("click", () => { save("recientes", []); renderChips(); });
+}
+function remember(q) {
+  const list = [q, ...load("recientes", []).filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 6);
+  save("recientes", list);
 }
 $("chips").addEventListener("click", (e) => {
   const b = e.target.closest("[data-q]");
   if (b) { $("q").value = b.dataset.q; runSearch(b.dataset.q); }
 });
 
-// ---- estados ----
 function showEmpty() {
   $("status").textContent = ""; $("controls").style.display = "none"; $("stores").hidden = true;
   $("results").innerHTML = '<div class="empty"><h2>¿Qué querés comparar?</h2>' +
     "<p>Escribí el nombre de un producto o escaneá su código de barras y te muestro dónde está más barato.</p></div>";
 }
 function showLoading() {
-  $("status").className = ""; $("status").textContent = "Buscando en los supermercados…";
+  $("status").className = "status"; $("status").textContent = "Buscando en los supermercados…";
   $("controls").style.display = "none"; $("stores").hidden = true;
   $("results").innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+}
+
+async function apiSearch(q) {
+  const r = await fetch("/api/search?q=" + encodeURIComponent(q));
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || "El servidor no pudo completar la búsqueda.");
+  return body;
 }
 
 async function runSearch(q) {
@@ -250,12 +422,10 @@ async function runSearch(q) {
   $("go").disabled = true;
   showLoading();
   try {
-    const r = await fetch("/api/search?q=" + encodeURIComponent(q));
-    const body = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(body.error || "El servidor no pudo completar la búsqueda.");
-    data = body; remember(q); renderChips(); render();
+    data = await apiSearch(q);
+    record(data.products); remember(q); renderChips(); render();
   } catch (e) {
-    $("status").className = "warn";
+    $("status").className = "status warn";
     $("status").textContent = "No se pudo buscar. " + (e.message || "Revisá tu conexión y probá de nuevo.");
     $("results").innerHTML = "";
   } finally {
@@ -263,7 +433,6 @@ async function runSearch(q) {
   }
 }
 
-// ---- cálculo de vista ----
 const bestOffer = (p) => p.offers.find((o) => o.in_stock) || null;
 function bestUnit(p) {
   const u = p.offers.filter((o) => o.in_stock && o.unit_price).map((o) => o.unit_price.value);
@@ -293,14 +462,16 @@ function offerRow(o, best) {
     (diff ? "<small>" + diff + "</small>" : "") + "</div></li>";
 }
 
-function productHTML(p) {
+const inList = (ean) => ean && myList.some((it) => canon(it.ean) === canon(ean));
+
+function productHTML(p, idx) {
   const best = bestOffer(p);
   const others = p.offers.filter((o) => o !== best);
   const LIMIT = 3;
   const shown = others.slice(0, LIMIT).map((o) => offerRow(o, best)).join("");
   const hidden = others.slice(LIMIT);
   const more = hidden.length
-    ? '<details class="more"><summary>Ver ' + hidden.length + (hidden.length === 1 ? " tienda más" : " tiendas más") + "</summary><ul class=\"rows\">" +
+    ? '<details class="more"><summary>Ver ' + hidden.length + (hidden.length === 1 ? " tienda más" : " tiendas más") + '</summary><ul class="rows">' +
       hidden.map((o) => offerRow(o, best)).join("") + "</ul></details>" : "";
   let tag = '<p class="nostock">Sin stock en ninguna tienda.</p>';
   if (best) {
@@ -314,29 +485,28 @@ function productHTML(p) {
       (saving > 0 ? '<div class="sub">Ahorrás ' + money(saving) + " frente a " + esc(worst.store) + "</div>"
                   : '<div class="sub plain">Es la única tienda con stock</div>') + "</div></div>";
   }
+  const add = p.ean
+    ? '<div class="actions"><button type="button" class="btn addlist' + (inList(p.ean) ? " on" : "") + '" data-add="' + idx + '">' +
+      (inList(p.ean) ? "En tu lista (tocá para quitar)" : "Agregar a mi lista") + "</button></div>" : "";
   return '<section class="product"><div class="top">' +
     (p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=ph></div>\'">' : '<div class="ph"></div>') +
-    '<div><div class="name">' + esc(p.name) + '</div>' +
+    '<div><div class="name">' + esc(p.name) + "</div>" +
     (p.brand ? '<div class="meta">' + esc(p.brand) + "</div>" : "") +
     (p.ean ? '<div class="meta">Código ' + esc(p.ean) + "</div>" : "") + "</div></div>" +
-    tag + (shown ? '<ul class="rows">' + shown + "</ul>" : "") + more + "</section>";
+    tag + (shown ? '<ul class="rows">' + shown + "</ul>" : "") + more + add + (p.ean ? histHTML(p) : "") + "</section>";
 }
 
 function render() {
-  const list = view();
+  viewProducts = view();
   const ok = data.stores.filter((s) => s.ok), bad = data.stores.filter((s) => !s.ok);
   const st = $("status");
-  st.className = "";
-  if (!ok.length) {
-    st.className = "warn"; st.textContent = "Ninguna tienda respondió. Revisá tu conexión y probá de nuevo.";
-  } else if (!list.length) {
-    st.textContent = "No encontré “" + data.query + "”. Probá con otra palabra o con el código de barras.";
-  } else {
-    st.textContent = list.length + (list.length === 1 ? " producto" : " productos") + " en " + ok.length + " de " + data.stores.length + " tiendas" +
-      (data.mode === "ean" ? ", buscado por código de barras" : "") + ".";
-  }
-  $("controls").style.display = list.length ? "flex" : "none";
-  $("results").innerHTML = list.map(productHTML).join("");
+  st.className = "status";
+  if (!ok.length) { st.className = "status warn"; st.textContent = "Ninguna tienda respondió. Revisá tu conexión y probá de nuevo."; }
+  else if (!viewProducts.length) st.textContent = "No encontré “" + data.query + "”. Probá con otra palabra o con el código de barras.";
+  else st.textContent = viewProducts.length + (viewProducts.length === 1 ? " producto" : " productos") + " en " + ok.length + " de " + data.stores.length + " tiendas" +
+    (data.mode === "ean" ? ", buscado por código de barras" : "") + ".";
+  $("controls").style.display = viewProducts.length ? "flex" : "none";
+  $("results").innerHTML = viewProducts.map(productHTML).join("");
 
   const box = $("stores");
   box.hidden = false;
@@ -346,7 +516,6 @@ function render() {
       : '<li class="bad">' + esc(s.store) + ": " + esc(s.error || "no respondió") + "</li>").join("") + "</ul>";
 }
 
-// ---- eventos ----
 $("form").addEventListener("submit", (e) => { e.preventDefault(); runSearch($("q").value); });
 document.querySelectorAll("[data-sort]").forEach((b) => b.addEventListener("click", () => {
   sortBy = b.dataset.sort;
@@ -355,7 +524,193 @@ document.querySelectorAll("[data-sort]").forEach((b) => b.addEventListener("clic
 }));
 $("hideOut").addEventListener("change", (e) => { hideOut = e.target.checked; if (data) render(); });
 
-// ---- escáner de código de barras (BarcodeDetector: Chrome en Android y PC, Safari reciente) ----
+$("results").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-add]");
+  if (!b) return;
+  const p = viewProducts[Number(b.dataset.add)];
+  if (!p || !p.ean) return;
+  const k = canon(p.ean), i = myList.findIndex((it) => canon(it.ean) === k);
+  if (i >= 0) myList.splice(i, 1);
+  else myList.push({ ean: p.ean, name: p.name, brand: p.brand || "", image: p.image || "", qty: 1 });
+  save("lista-v1", myList); updateCount();
+  b.classList.toggle("on", i < 0);
+  b.textContent = i < 0 ? "En tu lista (tocá para quitar)" : "Agregar a mi lista";
+});
+
+// ================= mi lista =================
+let checked = {};        // canon(ean) -> {offers:[...in stock...], all:[...]}
+let failedStores = new Set();
+let checking = false;
+
+function updateCount() {
+  const n = myList.length;
+  $("listcount").hidden = !n; $("listcount").textContent = n;
+}
+
+function itemHTML(it) {
+  const r = checked[canon(it.ean)];
+  let now = "";
+  if (r) {
+    const o = r.offers[0];
+    now = o ? 'Mejor hoy: <b>' + money(o.price) + "</b> en " + esc(o.store) : "Sin stock en ninguna tienda";
+  }
+  return '<div class="item" data-k="' + esc(canon(it.ean)) + '">' +
+    (it.image ? '<img src="' + esc(it.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=ph></div>\'">' : '<div class="ph"></div>') +
+    '<div class="info"><div class="name">' + esc(it.name) + "</div>" + (now ? '<div class="now">' + now + "</div>" : "") + "</div>" +
+    '<div class="qty"><button type="button" data-q="-1" aria-label="Menos unidades">−</button><span aria-live="polite">' + it.qty + '</span><button type="button" data-q="1" aria-label="Más unidades">+</button></div>' +
+    '<button type="button" class="rm" data-rm aria-label="Quitar de la lista">✕</button></div>';
+}
+
+function planFor() {
+  const rows = myList.map((it) => ({ it, offers: ((checked[canon(it.ean)] || {}).offers || []) }));
+  const needed = rows.filter((r) => r.offers.length);
+  const names = [...new Set(needed.flatMap((r) => r.offers.map((o) => o.store)))].filter((s) => !failedStores.has(s));
+  const totals = names.map((s) => {
+    let total = 0, missing = 0;
+    needed.forEach((r) => { const o = r.offers.find((x) => x.store === s); if (o) total += o.price * r.it.qty; else missing++; });
+    return { store: s, total, missing };
+  });
+  const complete = totals.filter((t) => !t.missing).sort((a, b) => a.total - b.total);
+  const partial = totals.filter((t) => t.missing).sort((a, b) => a.missing - b.missing || a.total - b.total);
+  const stops = {};
+  let splitTotal = 0;
+  needed.forEach((r) => {
+    const pool = r.offers.filter((o) => !failedStores.has(o.store));
+    const o = (pool.length ? pool : r.offers)[0];   // las ofertas ya vienen ordenadas por precio
+    (stops[o.store] = stops[o.store] || { items: [], sub: 0 });
+    stops[o.store].items.push({ it: r.it, price: o.price });
+    stops[o.store].sub += o.price * r.it.qty;
+    splitTotal += o.price * r.it.qty;
+  });
+  return { needed, noStock: rows.filter((r) => !r.offers.length), complete, partial, stops, splitTotal };
+}
+
+function summaryHTML() {
+  if (!Object.keys(checked).length) return "";
+  const pl = planFor();
+  if (!pl.needed.length) return '<p class="fine">Ningún producto de la lista tiene stock en las tiendas consultadas.</p>';
+  const bestSingle = pl.complete[0];
+  const stopNames = Object.keys(pl.stops).sort((a, b) => pl.stops[b].sub - pl.stops[a].sub);
+  let html = '<div class="plan"><h3>Lo más barato de toda tu lista</h3><div class="big"><b>' + money(pl.splitTotal) + "</b>";
+  if (bestSingle && bestSingle.total > pl.splitTotal) html += '<span class="good">Ahorrás ' + money(bestSingle.total - pl.splitTotal) + " frente a comprar todo en " + esc(bestSingle.store) + "</span>";
+  else if (bestSingle) html += '<span class="good">Conviene comprar todo en ' + esc(bestSingle.store) + "</span>";
+  html += "</div>";
+  stopNames.forEach((s) => {
+    html += '<div class="stop"><div class="h"><span>' + esc(s) + "</span><span>" + money(pl.stops[s].sub) + "</span></div><ul>" +
+      pl.stops[s].items.map((x) => "<li><span>" + (x.it.qty > 1 ? x.it.qty + " × " : "") + esc(x.it.name) + "</span><span>" + money(x.price * x.it.qty) + "</span></li>").join("") + "</ul></div>";
+  });
+  html += "</div>";
+
+  if (pl.complete.length) {
+    html += '<div class="totals"><h3>Todo en una sola tienda</h3><ul class="rows">' +
+      pl.complete.map((t, i) => '<li class="row"><span class="dot" aria-hidden="true">' + esc(initials(t.store)) + '</span><div class="who"><b>' + esc(t.store) + "</b>" +
+        (i === 0 ? '<span class="badge promo" style="background:var(--good)">La más barata</span>' : "") + '</div><div class="amt"><b>' + money(t.total) + "</b></div></li>").join("") + "</ul></div>";
+  }
+  if (pl.partial.length) {
+    html += '<details class="more"><summary>Tiendas que no tienen todo (' + pl.partial.length + ")</summary><ul class=\"rows\">" +
+      pl.partial.map((t) => '<li class="row"><span class="dot" aria-hidden="true">' + esc(initials(t.store)) + '</span><div class="who"><b>' + esc(t.store) +
+        "</b><small>Les faltan " + t.missing + (t.missing === 1 ? " producto" : " productos") + '</small></div><div class="amt"><b>' + money(t.total) + "</b></div></li>").join("") + "</ul></details>";
+  }
+  const notes = [];
+  if (pl.noStock.length) notes.push("Sin stock en ninguna tienda: " + pl.noStock.map((r) => esc(r.it.name)).join(", ") + ".");
+  if (failedStores.size) notes.push("No se pudo consultar " + [...failedStores].map(esc).join(", ") + " en esta revisión; esas tiendas no entran en las comparaciones.");
+  notes.push("No incluye envío. Los precios pueden cambiar según la sucursal.");
+  return html + '<p class="fine">' + notes.join(" ") + "</p>";
+}
+
+function renderList() {
+  updateCount();
+  const box = $("items");
+  $("check").disabled = checking || !myList.length;
+  if (!myList.length) {
+    $("lstatus").textContent = "";
+    box.innerHTML = '<div class="empty"><h2>Tu lista está vacía</h2><p>Buscá un producto y tocá “Agregar a mi lista”. Después revisás todos los precios juntos y ves dónde te conviene comprar.</p>' +
+      '<p><button type="button" class="btn solid" id="gosearch" style="margin-top:12px">Buscar productos</button></p></div>';
+    $("summary").innerHTML = "";
+    const g = $("gosearch"); if (g) g.addEventListener("click", () => { showTab("search"); $("q").focus(); });
+    return;
+  }
+  box.innerHTML = myList.map(itemHTML).join("");
+  $("summary").innerHTML = summaryHTML();
+  if (!checking && !Object.keys(checked).length) $("lstatus").textContent = "Tocá “Revisar precios” para ver cuánto cuesta tu lista hoy.";
+}
+
+$("items").addEventListener("click", (e) => {
+  const row = e.target.closest(".item");
+  if (!row) return;
+  const it = myList.find((x) => canon(x.ean) === row.dataset.k);
+  if (!it) return;
+  const q = e.target.closest("[data-q]");
+  if (q) it.qty = Math.min(99, Math.max(1, it.qty + Number(q.dataset.q)));
+  else if (e.target.closest("[data-rm]")) myList = myList.filter((x) => x !== it);
+  else return;
+  save("lista-v1", myList);
+  renderList();
+  if (data && !$("view-search").hidden) render();
+});
+
+async function pool(items, n, fn) {
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (i < items.length) { const idx = i++; await fn(items[idx], idx); }
+  }));
+}
+
+$("check").addEventListener("click", async () => {
+  if (checking || !myList.length) return;
+  checking = true; checked = {}; failedStores = new Set();
+  const total = myList.length; let done = 0, errors = 0;
+  $("check").disabled = true; $("summary").innerHTML = "";
+  $("progress").hidden = false; $("progress").firstElementChild.style.width = "0";
+  $("lstatus").className = "status"; $("lstatus").textContent = "Revisando 0 de " + total + "…";
+  await pool(myList.slice(), 3, async (it) => {
+    try {
+      const d = await apiSearch(it.ean);
+      d.stores.filter((s) => !s.ok).forEach((s) => failedStores.add(s.store));
+      record(d.products);
+      const p = d.products.find((x) => canon(x.ean) === canon(it.ean));
+      const all = p ? p.offers : [];
+      checked[canon(it.ean)] = { all, offers: all.filter((o) => o.in_stock) };
+    } catch (_) { errors++; }
+    done++;
+    $("lstatus").textContent = "Revisando " + done + " de " + total + "…";
+    $("progress").firstElementChild.style.width = Math.round((done / total) * 100) + "%";
+  });
+  checking = false; $("progress").hidden = true;
+  if (errors === total) { $("lstatus").className = "status warn"; $("lstatus").textContent = "No se pudo revisar la lista. Revisá tu conexión y probá de nuevo."; }
+  else {
+    $("lstatus").className = "status";
+    $("lstatus").textContent = errors ? "Se revisaron " + (total - errors) + " de " + total + " productos; " + errors + " no respondieron. Podés volver a intentar." : "Precios de hoy, " + new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long" }) + ".";
+  }
+  renderList();
+});
+
+// ---- copia de seguridad ----
+$("export").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({ version: 1, lista: myList, historial: history })], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "comparador-copia-" + today() + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+$("import").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.lista) || typeof d.historial !== "object") throw new Error();
+    myList = d.lista.filter((x) => x && x.ean && x.name).map((x) => ({ ean: String(x.ean), name: String(x.name), brand: String(x.brand || ""), image: String(x.image || ""), qty: Math.min(99, Math.max(1, Number(x.qty) || 1)) }));
+    history = d.historial;
+    save("lista-v1", myList); save("historial-v1", history);
+    checked = {}; renderList();
+    $("lstatus").className = "status"; $("lstatus").textContent = "Copia cargada: " + myList.length + " productos en tu lista.";
+  } catch (_) {
+    $("lstatus").className = "status warn"; $("lstatus").textContent = "Ese archivo no es una copia válida de esta app.";
+  }
+});
+
+// ================= escáner de código de barras =================
 let stream = null, timer = null;
 function stopScan() {
   clearInterval(timer); timer = null;
@@ -364,22 +719,12 @@ function stopScan() {
 }
 $("stop").addEventListener("click", stopScan);
 $("scan").addEventListener("click", async () => {
-  const st = $("status"); st.className = "warn";
-  if (!("BarcodeDetector" in window)) {
-    st.textContent = "Este navegador no puede escanear. Escribí el número que está debajo de las barras.";
-    return;
-  }
-  if (!window.isSecureContext) {
-    st.textContent = "La cámara solo funciona desde una dirección https o desde localhost.";
-    return;
-  }
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-  } catch (e) {
-    st.textContent = "No pude abrir la cámara. Permití el acceso en el navegador o escribí el número a mano.";
-    return;
-  }
-  st.className = ""; st.textContent = "";
+  const st = $("status"); st.className = "status warn";
+  if (!("BarcodeDetector" in window)) { st.textContent = "Este navegador no puede escanear. Escribí el número que está debajo de las barras."; return; }
+  if (!window.isSecureContext) { st.textContent = "La cámara solo funciona desde una dirección https o desde localhost."; return; }
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); }
+  catch (e) { st.textContent = "No pude abrir la cámara. Permití el acceso en el navegador o escribí el número a mano."; return; }
+  st.className = "status"; st.textContent = "";
   const video = $("video");
   video.srcObject = stream; await video.play();
   $("scanner").style.display = "block";
@@ -391,15 +736,13 @@ $("scan").addEventListener("click", async () => {
         const value = codes[0].rawValue;
         stopScan();
         if (navigator.vibrate) navigator.vibrate(60);
-        $("q").value = value;
-        runSearch(value);
+        $("q").value = value; runSearch(value);
       }
     } catch (_) { /* el cuadro todavía no está listo */ }
   }, 300);
 });
 
-renderChips();
-showEmpty();
+renderChips(); updateCount(); showEmpty();
 </script>
 </body>
 </html>

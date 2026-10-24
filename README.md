@@ -1,7 +1,20 @@
 # Comparador de precios de supermercados
 
-Busca un producto en Carrefour, Jumbo, Disco, Vea, Día y ChangoMás a la vez y
+Busca un producto en Carrefour, Jumbo, Disco, Vea, Día, ChangoMás, Toledo y Coto a la vez y
 muestra cuál lo tiene más barato. Funciona por **código de barras (EAN)** o por **nombre**.
+
+## Historial de precios y lista de compras
+
+- **Historial:** cada vez que buscás un producto se guarda su menor precio del día. En cada
+  producto, "Historial de precios" muestra el gráfico y si hoy está más barato o más caro que
+  lo habitual. Mientras más días lo busques, más útil es.
+- **Mi lista:** en cada producto tocá "Agregar a mi lista". En la pestaña "Mi lista" ponés
+  cantidades y tocás "Revisar precios": te dice cuánto sale todo en cada tienda y cuánto
+  gastás si repartís la compra comprando cada cosa donde está más barata.
+- Todo esto se guarda **en el teléfono** (no en el servidor), así que no se pierde cuando
+  Render se reinicia. Cada dispositivo tiene su propia lista e historial. Si borrás los datos
+  del navegador se pierden: usá "Copia de seguridad" en Mi lista para guardar un archivo y
+  cargarlo en otro dispositivo.
 
 Hay tres formas de usarlo en el teléfono. Elegí una.
 

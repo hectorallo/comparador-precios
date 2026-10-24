@@ -32,6 +32,7 @@ STORES = {
     "Vea": "https://www.vea.com.ar",
     "Día": "https://diaonline.supermercadosdia.com.ar",
     "ChangoMás": "https://www.masonline.com.ar",
+    "Toledo": "https://www.toledodigital.com.ar",
 }
 
 # Coto (Constructor.io). La clave es la clave pública que el sitio de Coto
@@ -50,7 +51,7 @@ COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
-VERSION = "2026-10-24-c"
+VERSION = "2026-10-24-d"
 
 TIMEOUT = 10          # segundos por tienda
 CACHE_TTL = 600       # 10 minutos
@@ -176,14 +177,27 @@ def parse_products(store, base, data, wanted_ean=None):
 
 def fetch_store(store, base, q, by_ean):
     url = f"{base}/api/catalog_system/pub/products/search"
-    if by_ean:
-        params = {"fq": f"alternateIds_Ean:{q}"}
-    else:
+    if not by_ean:
         params = {"ft": q, "_from": 0, "_to": MAX_PER_STORE - 1}
-    r = SESSION.get(url, params=params, timeout=TIMEOUT)
-    if r.status_code not in (200, 206):
-        raise RuntimeError(f"la tienda respondió con error {r.status_code}")
-    return parse_products(store, base, r.json(), q if by_ean else None)
+        r = SESSION.get(url, params=params, timeout=TIMEOUT)
+        if r.status_code not in (200, 206):
+            raise RuntimeError(f"la tienda respondió con error {r.status_code}")
+        return parse_products(store, base, r.json(), None)
+    # El mismo producto puede estar cargado como GTIN-14 (con un 0 adelante),
+    # EAN-13 o UPC-12: se prueban las variantes hasta encontrarlo.
+    variants = [q]
+    if len(q) == 14 and q.startswith("0"):
+        variants.append(q[1:])
+    if len(q) == 12:
+        variants.append("0" + q)
+    for v in variants:
+        r = SESSION.get(url, params={"fq": f"alternateIds_Ean:{v}"}, timeout=TIMEOUT)
+        if r.status_code not in (200, 206):
+            raise RuntimeError(f"la tienda respondió con error {r.status_code}")
+        found = parse_products(store, base, r.json(), q)
+        if found:
+            return found
+    return []
 
 
 # ---------- Coto (Constructor.io) ----------
@@ -305,6 +319,9 @@ def group_products(results):
         })
         if not g["image"] and r["image"]:
             g["image"] = r["image"]
+        # mostrar la forma más corta del código (EAN-13 antes que GTIN-14)
+        if r["ean"] and (not g["ean"] or len(r["ean"]) < len(g["ean"])):
+            g["ean"] = r["ean"]
         g["offers"].append({k: r[k] for k in (
             "store", "price", "list_price", "in_stock", "url", "promo", "unit_price")})
     out = []
