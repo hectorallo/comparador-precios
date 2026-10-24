@@ -36,7 +36,15 @@ STORES = {
 
 # Coto (Constructor.io). La clave es la clave pública que el sitio de Coto
 # manda desde el navegador; ver README para encontrarla.
-COTO_KEY = os.environ.get("COTO_KEY", "").strip()
+def _clean_key(raw):
+    """Acepta la clave pegada con comillas, con 'key=' adelante o con '&...' atrás."""
+    k = (raw or "").strip().strip("\"'")
+    if k.lower().startswith("key="):
+        k = k[4:]
+    return k.split("&")[0].strip()
+
+
+COTO_KEY = _clean_key(os.environ.get("COTO_KEY"))
 COTO_STORE_ID = os.environ.get("COTO_STORE_ID", "200").strip()  # sucursal de referencia
 COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
@@ -174,25 +182,31 @@ def fetch_store(store, base, q, by_ean):
 def _coto_request(term, per_page):
     if not COTO_KEY:
         raise RuntimeError("falta configurar COTO_KEY (ver README)")
-    params = {
-        "key": COTO_KEY,
-        "i": COTO_CLIENT_ID,
-        "s": 1,
-        "c": "ciojs-client-2.35.2",
-        "page": 1,
-        "num_results_per_page": per_page,
-    }
-    r = SESSION.get(
-        f"{COTO_API}/search/{quote(term, safe='')}",
-        params=params,
-        headers={"Referer": "https://www.cotodigital.com.ar/", "Origin": "https://www.cotodigital.com.ar"},
-        timeout=TIMEOUT,
-    )
-    if r.status_code in (401, 403):
-        raise RuntimeError("Coto rechazó la clave; revisá COTO_KEY")
-    if r.status_code != 200:
-        raise RuntimeError(f"Coto respondió con error {r.status_code}")
-    return (r.json().get("response") or {}).get("results") or []
+    base = {"key": COTO_KEY, "num_results_per_page": per_page, "page": 1}
+    # Si el pedido completo da 400, se reintenta con menos parámetros.
+    attempts = [
+        {**base, "i": COTO_CLIENT_ID, "s": 1, "c": "ciojs-client-2.35.2"},
+        {**base, "i": COTO_CLIENT_ID},
+        {"key": COTO_KEY, "num_results_per_page": per_page},
+    ]
+    headers = {"Referer": "https://www.cotodigital.com.ar/", "Origin": "https://www.cotodigital.com.ar"}
+    url = f"{COTO_API}/search/{quote(term, safe='')}"
+    first_problem = None
+    for params in attempts:
+        r = SESSION.get(url, params=params, headers=headers, timeout=TIMEOUT)
+        if r.status_code == 200:
+            return (r.json().get("response") or {}).get("results") or []
+        if r.status_code in (401, 403):
+            raise RuntimeError("Coto rechazó la clave; revisá COTO_KEY")
+        if first_problem is None:
+            try:
+                msg = r.json().get("message") or r.text
+            except ValueError:
+                msg = r.text
+            first_problem = f"Coto respondió con error {r.status_code}: {str(msg).strip()[:100]}"
+        if r.status_code != 400:
+            break
+    raise RuntimeError(first_problem)
 
 
 def _coto_price(data):
