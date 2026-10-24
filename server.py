@@ -50,6 +50,8 @@ COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
+VERSION = "2026-10-24-c"
+
 TIMEOUT = 10          # segundos por tienda
 CACHE_TTL = 600       # 10 minutos
 MAX_PER_STORE = 8     # resultados por tienda en búsqueda por nombre
@@ -139,7 +141,7 @@ def parse_products(store, base, data, wanted_ean=None):
     out = []
     for p in data or []:
         for item in p.get("items", []):
-            ean = (item.get("ean") or "").strip() or None
+            ean = _s(item.get("ean")) or None
             if wanted_ean and ean and canon(ean) != canon(wanted_ean):
                 continue
             sellers = item.get("sellers") or []
@@ -364,6 +366,12 @@ def api_search():
     if len(q) < 2:
         return jsonify(error="Escribí al menos 2 letras o un código de barras."), 400
     return jsonify(search(q))
+
+
+@app.get("/api/version")
+def api_version():
+    """Sirve para comprobar qué versión del programa está publicada."""
+    return jsonify(version=VERSION, coto_key_cargada=bool(COTO_KEY))
 
 
 @app.get("/api/debug/coto")
