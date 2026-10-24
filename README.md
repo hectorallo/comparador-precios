@@ -3,6 +3,23 @@
 Busca un producto en Carrefour, Jumbo, Disco, Vea, Día, ChangoMás, Toledo y Coto a la vez y
 muestra cuál lo tiene más barato. Funciona por **código de barras (EAN)** o por **nombre**.
 
+## Carrito: cuánto estoy pagando en el súper
+
+En la pestaña **Carrito**:
+1. Elegí en qué súper estás ("Comprando en").
+2. Tocá "Escanear productos" y pasá la cámara por cada cosa que ponés en el carrito (o
+   escribí el código a mano). Si escaneás el mismo producto otra vez, suma una unidad.
+3. Abajo, siempre a la vista, aparece el **total aproximado**.
+
+Detalles:
+- Usa el precio de la web de esa tienda. Si el producto no está ahí, te lo marca y podés
+  **escribir el precio de la góndola a mano** (vale solo para esa tienda).
+- Si la tienda informa una promo (por ejemplo "2da al 50%"), la muestra, pero **no la
+  descuenta** del total: normalmente se aplica en caja.
+- Te dice si ese mismo carrito habría salido más barato en otra tienda.
+- Es aproximado: puede diferir del ticket por promos, por la sucursal o por cambios de precio.
+- Cambiar de tienda recalcula todo con los precios de la nueva tienda.
+
 ## Historial de precios y lista de compras
 
 - **Historial:** cada vez que buscás un producto se guarda su menor precio del día. En cada

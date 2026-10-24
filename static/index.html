@@ -52,8 +52,8 @@
   .brand { display: flex; align-items: center; gap: 10px; margin: 2px 0 14px; }
   .brand svg { width: 34px; height: 34px; flex: none; }
   .brand b { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
-  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 2px solid var(--ink); border-radius: 12px; overflow: hidden; margin-bottom: 14px; background: var(--card); }
-  .tabs button { border: 0; background: transparent; color: var(--ink); padding: 11px 8px; font: 700 1rem var(--font); cursor: pointer; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 2px solid var(--ink); border-radius: 12px; overflow: hidden; margin-bottom: 14px; background: var(--card); }
+  .tabs button { border: 0; background: transparent; color: var(--ink); padding: 11px 4px; font: 700 .9375rem var(--font); cursor: pointer; }
   .tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
   .count { display: inline-block; min-width: 22px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--tag); color: var(--tag-ink); font-size: .8125rem; line-height: 22px; }
 
@@ -89,7 +89,7 @@
   .btn:disabled { opacity: .55; cursor: default; }
 
   /* ---- escáner ---- */
-  #scanner { display: none; margin-top: 14px; }
+  #scanner, #cscanner { display: none; margin-top: 14px; }
   .viewfinder { position: relative; border-radius: 14px; overflow: hidden; background: #000; }
   .viewfinder video { display: block; width: 100%; height: 260px; object-fit: cover; }
   .viewfinder::after {
@@ -202,6 +202,26 @@
   .progress i { display: block; height: 100%; width: 0; background: var(--ink); transition: width .2s; }
   @media (prefers-reduced-motion: reduce) { .progress i { transition: none; } }
 
+  /* ---- carrito ---- */
+  .storepick { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .9375rem; }
+  .storepick select { font: 700 1rem var(--font); padding: 9px 10px; border: 2px solid var(--ink); border-radius: 10px; background: var(--card); color: var(--ink); }
+  .cadd { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: stretch; }
+  .cadd > .btn { flex: 1 1 100%; }
+  .codeform { display: flex; flex: 1 1 100%; min-width: 0; gap: 8px; margin: 0; }
+  .codeform .btn { flex: none; }
+  .codeform input { flex: 1 1 0; width: 0; min-width: 0; border: 2px solid var(--ink); border-radius: 10px; padding: 9px 12px; font: 500 1rem var(--font); background: var(--card); color: var(--ink); }
+  .pr { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; background: var(--paper); color: var(--ink); font-weight: 700; }
+  .pr:focus-within { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .pr input { width: 84px; border: 0; outline: none; background: transparent; color: var(--ink); font: 700 1rem var(--font); padding: 4px 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .item .now .sub-total { display: block; font-weight: 700; color: var(--ink); margin-top: 4px; }
+  .item .now .warnline { display: block; color: var(--promo); margin-bottom: 4px; }
+  .item .now .badge { margin-left: 6px; }
+  .totalbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--ink); color: var(--paper); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .totalbar .in { max-width: 720px; margin: 0 auto; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .totalbar b { font-size: 1.75rem; font-weight: 850; font-stretch: 80%; font-variant-numeric: tabular-nums; }
+  .totalbar small { font-size: .875rem; opacity: .85; }
+  body.incart main { padding-bottom: 130px; }
+
   /* ---- vacío, carga y errores ---- */
   .empty { text-align: center; padding: 36px 8px 8px; }
   .empty h2 { font-size: 1.5rem; margin: 0 0 6px; letter-spacing: -0.01em; }
@@ -226,6 +246,7 @@
   <div class="tabs" role="tablist">
     <button type="button" role="tab" id="tab-search" aria-selected="true" aria-controls="view-search">Buscar</button>
     <button type="button" role="tab" id="tab-list" aria-selected="false" aria-controls="view-list">Mi lista<span class="count" id="listcount" hidden>0</span></button>
+    <button type="button" role="tab" id="tab-cart" aria-selected="false" aria-controls="view-cart">Carrito<span class="count" id="cartcount" hidden>0</span></button>
   </div>
 
   <!-- ===== Buscar ===== -->
@@ -282,7 +303,34 @@
       </div>
     </details>
   </section>
+
+  <!-- ===== Carrito (compra en el súper) ===== -->
+  <section id="view-cart" role="tabpanel" aria-labelledby="tab-cart" hidden>
+    <div class="listhead">
+      <h2>Compra en el súper</h2>
+      <label class="storepick">Comprando en <select id="cstore"></select></label>
+    </div>
+    <div class="cadd">
+      <button type="button" class="btn solid" id="cscan">Escanear productos</button>
+      <form id="cform" class="codeform">
+        <input id="ccode" inputmode="numeric" placeholder="o escribí el código" autocomplete="off" aria-label="Código de barras">
+        <button type="submit" class="btn">Agregar</button>
+      </form>
+    </div>
+    <div id="cscanner">
+      <div class="viewfinder"><video id="cvideo" playsinline muted></video></div>
+      <p class="fine">Seguí escaneando: cada código que lea se suma al carrito.</p>
+    </div>
+    <div id="cstatus" class="status" role="status" aria-live="polite"></div>
+    <div id="citems"></div>
+    <div id="ccompare" class="summary"></div>
+    <div class="actions"><button type="button" class="btn" id="cclear" hidden>Vaciar carrito</button></div>
+  </section>
 </main>
+
+<div class="totalbar" id="totalbar" hidden>
+  <div class="in"><div><small id="tbsub"></small><br><small>Total aproximado</small></div><b id="tbtotal"></b></div>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -368,14 +416,19 @@ function histHTML(p) {
 
 // ================= pestañas =================
 function showTab(name) {
-  const isList = name === "list";
-  $("view-search").hidden = isList; $("view-list").hidden = !isList;
-  $("tab-search").setAttribute("aria-selected", String(!isList));
-  $("tab-list").setAttribute("aria-selected", String(isList));
-  if (isList) renderList();
+  stopScan(); stopCartScan();
+  for (const t of ["search", "list", "cart"]) {
+    $("view-" + t).hidden = t !== name;
+    $("tab-" + t).setAttribute("aria-selected", String(t === name));
+  }
+  document.body.classList.toggle("incart", name === "cart");
+  if (name === "list") renderList();
+  if (name === "cart") renderCart();
+  updateTotalBar();
 }
 $("tab-search").addEventListener("click", () => showTab("search"));
 $("tab-list").addEventListener("click", () => showTab("list"));
+$("tab-cart").addEventListener("click", () => showTab("cart"));
 
 // ================= buscar =================
 const EXAMPLES = ["leche entera", "yerba mate", "aceite de girasol", "fideos tirabuzón", "arroz largo fino"];
@@ -545,6 +598,8 @@ let checking = false;
 function updateCount() {
   const n = myList.length;
   $("listcount").hidden = !n; $("listcount").textContent = n;
+  const c = cart.items.length;
+  $("cartcount").hidden = !c; $("cartcount").textContent = c;
 }
 
 function itemHTML(it) {
@@ -708,6 +763,197 @@ $("file").addEventListener("change", async (e) => {
   } catch (_) {
     $("lstatus").className = "status warn"; $("lstatus").textContent = "Ese archivo no es una copia válida de esta app.";
   }
+});
+
+// ================= carrito (compra en el súper) =================
+const STORE_NAMES = ["Coto", "Carrefour", "Jumbo", "Disco", "Vea", "Día", "ChangoMás", "Toledo"];
+let cart = load("carrito-v1", null);
+if (!cart || !Array.isArray(cart.items)) cart = { store: "Coto", items: [] };
+if (!STORE_NAMES.includes(cart.store)) cart.store = "Coto";
+cart.items.forEach((it) => { if (it.loading || it.name === "Buscando…") { it.loading = false; it.name = "Producto " + it.ean + " (sin datos)"; } });
+const saveCart = () => save("carrito-v1", cart);
+const isCode = (s) => /^\d+$/.test(s) && [8, 12, 13, 14].includes(s.length);
+const offerFor = (it, store) => (it.offers || []).find((o) => o.store === store && o.in_stock) || null;
+// Un precio escrito a mano vale solo para la tienda donde se escribió.
+const isManual = (it) => it.manual && it.manualStore === cart.store;
+function priceOf(it) {
+  if (isManual(it)) return it.price;
+  const o = offerFor(it, cart.store);
+  return o ? o.price : null;
+}
+// Acepta "1450", "1450,5", "1.450" (mil cuatrocientos cincuenta) y "1.450,50". Devuelve null si no es un precio.
+function parsePrice(s) {
+  let t = String(s).replace(/[\s$]/g, "");
+  if (!t) return null;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+function cartStatus(msg, warn) { const s = $("cstatus"); s.className = "status" + (warn ? " warn" : ""); s.textContent = msg || ""; }
+
+function cartTotals() {
+  let total = 0, noPrice = 0, units = 0;
+  cart.items.forEach((it) => {
+    units += it.qty;
+    const p = priceOf(it);
+    if (p == null) { if (!it.loading) noPrice++; } else total += p * it.qty;
+  });
+  return { total, noPrice, units };
+}
+
+function updateTotalBar() {
+  const show = !$("view-cart").hidden && cart.items.length > 0;
+  $("totalbar").hidden = !show;
+  if (!show) return;
+  const t = cartTotals();
+  $("tbtotal").textContent = money(t.total);
+  $("tbsub").textContent = t.units + (t.units === 1 ? " unidad" : " unidades") + (t.noPrice ? ", " + t.noPrice + " sin precio" : "");
+}
+
+async function addCode(raw) {
+  const code = String(raw).trim();
+  if (!isCode(code)) { cartStatus("El código tiene que tener 8, 12, 13 o 14 números.", true); return; }
+  const k = canon(code);
+  const ex = cart.items.find((i) => canon(i.ean) === k);
+  if (ex) {
+    ex.qty = Math.min(99, ex.qty + 1); saveCart(); renderCart();
+    cartStatus("Sumaste otra unidad: " + ex.name); return;
+  }
+  const it = { ean: code, name: "Buscando…", image: "", qty: 1, offers: [], manual: false, price: null, loading: true };
+  cart.items.unshift(it); renderCart(); cartStatus("Buscando el precio…");
+  try {
+    const d = await apiSearch(code);
+    record(d.products);
+    const p = d.products.find((x) => canon(x.ean) === k);
+    if (p) {
+      it.name = p.name; it.image = p.image || ""; it.ean = p.ean || code;
+      it.offers = p.offers.map((o) => ({ store: o.store, price: o.price, in_stock: o.in_stock, promo: o.promo || null }));
+    } else it.name = "Producto " + code + " (no encontrado)";
+  } catch (_) { it.name = "Producto " + code + " (sin conexión)"; }
+  it.loading = false; saveCart(); renderCart();
+  const pr = priceOf(it);
+  if (pr != null) cartStatus("Agregado: " + it.name + ", " + money(pr));
+  else cartStatus("No encontré el precio en " + cart.store + ". Escribilo a mano en el producto.", true);
+}
+
+function cartItemHTML(it) {
+  const p = priceOf(it), o = offerFor(it, cart.store);
+  const sub = p != null ? p * it.qty : null;
+  const warn = it.loading ? "" : p == null ? '<span class="warnline">No está en ' + esc(cart.store) + ". Escribí el precio de la góndola.</span>" : "";
+  const promo = !isManual(it) && o && o.promo ? '<span class="badge promo">' + esc(o.promo) + "</span>" : "";
+  return '<div class="item" data-k="' + esc(canon(it.ean)) + '">' +
+    (it.image ? '<img src="' + esc(it.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=ph></div>\'">' : '<div class="ph"></div>') +
+    '<div class="info"><div class="name">' + esc(it.name) + '</div><div class="now">' + warn +
+    '<label class="pr"><span aria-hidden="true">$</span><input class="priceinp" inputmode="decimal" placeholder="precio" aria-label="Precio de una unidad" value="' +
+    (p != null ? String(p).replace(".", ",") : "") + '"></label>' +
+    (it.qty > 1 && sub != null ? '<span class="sub-total">Subtotal ' + money(sub) + "</span>" : "") +
+    (isManual(it) ? '<span class="badge out">a mano</span>' : "") + promo + "</div></div>" +
+    '<div class="qty"><button type="button" data-q="-1" aria-label="Menos unidades">−</button><span aria-live="polite">' + it.qty + '</span><button type="button" data-q="1" aria-label="Más unidades">+</button></div>' +
+    '<button type="button" class="rm" data-rm aria-label="Sacar del carrito">✕</button></div>';
+}
+
+function cartCompareHTML() {
+  const need = cart.items.filter((it) => !it.loading && (it.offers || []).some((o) => o.in_stock));
+  if (!need.length) return "";
+  const names = [...new Set(need.flatMap((it) => it.offers.filter((o) => o.in_stock).map((o) => o.store)))];
+  const rows = names.map((s) => {
+    let total = 0, missing = 0;
+    need.forEach((it) => { const o = offerFor(it, s); if (o) total += o.price * it.qty; else missing++; });
+    return { store: s, total, missing };
+  }).filter((r) => !r.missing).sort((a, b) => a.total - b.total);
+  const mine = rows.find((r) => r.store === cart.store);
+  let msg;
+  if (!rows.length) return "";
+  if (!mine) msg = "Algunos productos no están en " + esc(cart.store) + ", por eso no puedo comparar el carrito completo con otras tiendas.";
+  else if (rows[0].store === cart.store) msg = '<b class="good">' + esc(cart.store) + "</b> es la tienda más barata para este carrito entre las que tienen todo.";
+  else {
+    const best = rows[0], diff = mine.total - best.total;
+    msg = "Este mismo carrito costaría <b>" + money(best.total) + "</b> en <b>" + esc(best.store) + "</b>: " +
+      (diff > 0 ? '<span class="good">' + money(diff) + " menos que en " + esc(cart.store) + "</span>." : "es parecido.");
+  }
+  return '<div class="plan"><h3>¿Convenía otra tienda?</h3><p style="margin:0">' + msg + "</p></div>";
+}
+
+function renderCart() {
+  const sel = $("cstore");
+  if (!sel.options.length) sel.innerHTML = STORE_NAMES.map((s) => '<option value="' + esc(s) + '">' + esc(s) + "</option>").join("");
+  sel.value = cart.store;
+  updateCount();
+  const box = $("citems");
+  $("cclear").hidden = !cart.items.length;
+  $("cclear").textContent = "Vaciar carrito";
+  if (!cart.items.length) {
+    box.innerHTML = '<div class="empty"><h2>Tu carrito está vacío</h2><p>Elegí en qué súper estás, tocá “Escanear productos” y andá pasando cada cosa que ponés en el carrito.</p></div>';
+    $("ccompare").innerHTML = ""; updateTotalBar(); return;
+  }
+  box.innerHTML = cart.items.map(cartItemHTML).join("");
+  const t = cartTotals();
+  $("ccompare").innerHTML = cartCompareHTML() +
+    '<p class="fine">El total usa los precios de la web de ' + esc(cart.store) + ". Es aproximado: puede diferir del ticket por promociones que se descuentan en caja, precios distintos en tu sucursal o productos que cambiaron de precio hoy." +
+    (t.noPrice ? " Los productos sin precio no están sumados." : "") + "</p>";
+  updateTotalBar();
+}
+
+$("cstore").addEventListener("change", (e) => { cart.store = e.target.value; saveCart(); renderCart(); cartStatus(""); });
+$("cform").addEventListener("submit", (e) => { e.preventDefault(); const v = $("ccode").value; $("ccode").value = ""; addCode(v); });
+$("citems").addEventListener("click", (e) => {
+  const row = e.target.closest(".item"); if (!row) return;
+  const it = cart.items.find((x) => canon(x.ean) === row.dataset.k); if (!it) return;
+  const q = e.target.closest("[data-q]");
+  if (q) it.qty = Math.min(99, Math.max(1, it.qty + Number(q.dataset.q)));
+  else if (e.target.closest("[data-rm]")) cart.items = cart.items.filter((x) => x !== it);
+  else return;
+  saveCart(); renderCart();
+});
+$("citems").addEventListener("change", (e) => {
+  const inp = e.target.closest(".priceinp"); if (!inp) return;
+  const it = cart.items.find((x) => canon(x.ean) === inp.closest(".item").dataset.k); if (!it) return;
+  const num = parsePrice(inp.value);
+  if (num != null) { it.manual = true; it.manualStore = cart.store; it.price = num; } else { it.manual = false; it.price = null; }
+  saveCart(); renderCart();
+});
+let clearArmed = null;
+$("cclear").addEventListener("click", () => {
+  if (!clearArmed) {
+    $("cclear").textContent = "Tocá de nuevo para vaciar";
+    clearArmed = setTimeout(() => { clearArmed = null; $("cclear").textContent = "Vaciar carrito"; }, 3000);
+    return;
+  }
+  clearTimeout(clearArmed); clearArmed = null;
+  cart.items = []; saveCart(); cartStatus(""); renderCart();
+});
+
+// escaneo continuo: cada código nuevo que aparece se suma al carrito
+let cstream = null, ctimer = null, lastCode = "", lastSeen = 0;
+function stopCartScan() {
+  clearInterval(ctimer); ctimer = null;
+  if (cstream) cstream.getTracks().forEach((t) => t.stop());
+  cstream = null; $("cscanner").style.display = "none"; $("cscan").textContent = "Escanear productos";
+}
+$("cscan").addEventListener("click", async () => {
+  if (cstream) { stopCartScan(); return; }
+  if (!("BarcodeDetector" in window)) { cartStatus("Este navegador no puede escanear. Escribí el número que está debajo de las barras.", true); return; }
+  if (!window.isSecureContext) { cartStatus("La cámara solo funciona desde una dirección https o desde localhost.", true); return; }
+  try { cstream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); }
+  catch (e) { cartStatus("No pude abrir la cámara. Permití el acceso en el navegador o escribí el número a mano.", true); return; }
+  cartStatus("");
+  const video = $("cvideo");
+  video.srcObject = cstream; await video.play();
+  $("cscanner").style.display = "block"; $("cscan").textContent = "Cerrar cámara";
+  const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "itf"] });
+  ctimer = setInterval(async () => {
+    try {
+      const codes = (await detector.detect(video)).map((c) => c.rawValue).filter(isCode);
+      if (!codes.length) return;
+      const code = codes[0], now = Date.now();
+      const sameInFrame = code === lastCode && now - lastSeen < 1500;  // sigue a la vista: no sumar de nuevo
+      lastCode = code; lastSeen = now;
+      if (sameInFrame) return;
+      if (navigator.vibrate) navigator.vibrate(60);
+      addCode(code);
+    } catch (_) { /* el cuadro todavía no está listo */ }
+  }, 250);
 });
 
 // ================= escáner de código de barras =================
