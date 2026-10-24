@@ -63,6 +63,34 @@ Si desde ahí todas las tiendas salen "Sin respuesta", usá la opción A.
 
 ---
 
+## Coto: configurar la clave (una sola vez)
+
+Coto no usa la misma plataforma que las otras tiendas: su buscador es Constructor.io y
+necesita una clave pública que el sitio de Coto manda desde el navegador. No es secreta,
+pero hay que copiarla. Hacelo desde una PC:
+
+1. Abrí https://www.cotodigital.com.ar en Chrome.
+2. Apretá F12 (herramientas de desarrollador) y abrí la pestaña **Network** (Red).
+3. Buscá cualquier producto en el sitio de Coto, por ejemplo "leche".
+4. En la lista de pedidos filtrá por `cnstrc`. Hacé clic en uno que empiece con `search/`.
+5. En la dirección (Request URL) vas a ver `...?key=key_XXXXXXXXXXXX&...`. Copiá lo que va
+   después de `key=` hasta el siguiente `&`.
+
+Cargala como variable de entorno llamada `COTO_KEY`:
+
+- **Render:** en tu servicio, pestaña **Environment** → **Add Environment Variable**
+  → nombre `COTO_KEY`, valor la clave → guardá (se vuelve a publicar solo).
+- **Termux o PC:** `export COTO_KEY=key_XXXX` y después `python server.py`.
+  En Windows: `set COTO_KEY=key_XXXX`.
+
+Sin la clave, el resto de las tiendas funciona igual y Coto aparece como "Sin datos" con el motivo.
+
+Opcional: `COTO_STORE_ID` cambia la sucursal de referencia para los precios de Coto
+(por defecto `200`).
+
+**Si Coto responde pero no aparecen precios o aparecen mal:** activá `DEBUG_COTO=1`,
+abrí `/api/debug/coto?q=leche` y mandame lo que muestra para ajustar la lectura.
+
 ## Cómo funciona
 
 - Estas tiendas usan VTEX, que expone un endpoint público de catálogo:

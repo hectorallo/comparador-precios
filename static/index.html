@@ -2,152 +2,360 @@
 <html lang="es-AR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Comparador de precios</title>
 <link rel="manifest" href="/static/manifest.json">
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#1f7a4d">
+<meta name="theme-color" content="#14182b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6f7f4; --card: #ffffff; --ink: #1d2320; --muted: #66706a;
-    --line: #e2e6df; --accent: #1f7a4d; --accent-ink: #ffffff;
-    --best: #e5f4ea; --warn: #b4551d; --bad: #a33a3a;
+    --paper: #f2f4f7;
+    --card: #ffffff;
+    --ink: #14182b;
+    --muted: #5b6477;
+    --line: #d9dee6;
+    --tag: #ffd21f;
+    --tag-ink: #1a1400;
+    --promo: #c4243a;
+    --good: #14724a;
+    --focus: #2455d6;
+    --font: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #141816; --card: #1d2320; --ink: #eceee9; --muted: #98a39c;
-      --line: #2c3530; --accent: #4cc38a; --accent-ink: #0d1a13;
-      --best: #1c3a2a; --warn: #e08a52; --bad: #e07a7a;
+      --paper: #0e1120;
+      --card: #171b2e;
+      --ink: #eef0f6;
+      --muted: #a2a9bd;
+      --line: #2a3050;
+      --promo: #ff7b8c;
+      --good: #58d49c;
+      --focus: #8ab0ff;
     }
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 400 1rem/1.45 var(--font);
+    padding-bottom: env(safe-area-inset-bottom);
   }
-  main { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
-  h1 { font-size: 1.4rem; margin: 4px 0 16px; }
-  form { display: flex; gap: 8px; flex-wrap: wrap; }
-  input[type=search] {
-    flex: 1 1 220px; padding: 12px 14px; font-size: 1rem; color: var(--ink);
-    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  main { max-width: 720px; margin: 0 auto; padding: 18px 16px 56px; }
+
+  /* ---- encabezado y búsqueda ---- */
+  .brand { display: flex; align-items: center; gap: 10px; margin: 2px 0 14px; }
+  .brand svg { width: 34px; height: 34px; flex: none; }
+  .brand b { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
+
+  .search {
+    display: flex; align-items: stretch; background: var(--card);
+    border: 2px solid var(--ink); border-radius: 14px; overflow: hidden;
   }
-  button {
-    padding: 12px 16px; font-size: 1rem; border-radius: 10px; cursor: pointer;
+  .search:focus-within { border-color: var(--focus); }
+  .search input {
+    flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink);
+    font: 500 1.0625rem var(--font); padding: 15px 14px; outline: none;
+  }
+  .search input::placeholder { color: var(--muted); font-weight: 400; }
+  .search button {
+    border: 0; background: transparent; color: var(--ink); cursor: pointer;
+    padding: 0 14px; font: 700 1rem var(--font); display: flex; align-items: center; gap: 8px;
+  }
+  .search .scan { border-left: 1px solid var(--line); }
+  .search .go { background: var(--ink); color: var(--paper); padding: 0 20px; }
+  .search button svg { width: 22px; height: 22px; }
+  .search .scan span { font-weight: 600; }
+  @media (max-width: 420px) { .search .scan span { display: none; } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+  .chip {
     border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    border-radius: 999px; padding: 8px 14px; font: 500 0.9375rem var(--font); cursor: pointer;
   }
-  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-  button:disabled { opacity: .6; cursor: default; }
-  .hint { color: var(--muted); font-size: .875rem; margin: 8px 2px 0; }
-  #scanner { display: none; margin-top: 12px; }
-  #scanner video { width: 100%; max-height: 320px; background: #000; border-radius: 12px; object-fit: cover; }
-  #status { margin: 16px 2px; color: var(--muted); }
-  .product {
-    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
-    padding: 14px; margin: 12px 0;
+  .chip:hover { border-color: var(--ink); }
+
+  /* ---- escáner ---- */
+  #scanner { display: none; margin-top: 14px; }
+  .viewfinder { position: relative; border-radius: 14px; overflow: hidden; background: #000; }
+  .viewfinder video { display: block; width: 100%; height: 260px; object-fit: cover; }
+  .viewfinder::after {
+    content: ""; position: absolute; inset: 50px 12%; border: 3px solid var(--tag);
+    border-radius: 10px; box-shadow: 0 0 0 999px rgba(0,0,0,.45); pointer-events: none;
   }
-  .head { display: flex; gap: 12px; align-items: center; }
-  .head img { width: 64px; height: 64px; object-fit: contain; border-radius: 8px; background: #fff; }
-  .head .ph { width: 64px; height: 64px; border-radius: 8px; background: var(--line); }
-  .name { font-weight: 600; }
-  .meta { color: var(--muted); font-size: .8125rem; }
-  .save { margin-left: auto; text-align: right; font-size: .8125rem; color: var(--accent); font-weight: 600; white-space: nowrap; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  td { padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: middle; }
-  td.price { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
-  td.unit { text-align: right; color: var(--muted); font-size: .8125rem; white-space: nowrap; }
-  tr.best td { background: var(--best); }
-  tr.best td:first-child { border-radius: 8px 0 0 8px; }
-  tr.best td:last-child { border-radius: 0 8px 8px 0; }
-  tr.out td { color: var(--muted); }
-  .tag { font-size: .6875rem; padding: 2px 6px; border-radius: 6px; margin-left: 6px; background: var(--accent); color: var(--accent-ink); }
-  .tag.out { background: var(--line); color: var(--muted); }
-  .old { text-decoration: line-through; color: var(--muted); font-size: .75rem; margin-right: 6px; }
-  a { color: inherit; }
-  .errs { color: var(--warn); font-size: .8125rem; margin-top: 12px; }
+  #scanner p { margin: 8px 2px; color: var(--muted); font-size: .9375rem; }
+
+  /* ---- barra de estado y orden ---- */
+  #status { margin: 20px 2px 0; color: var(--muted); font-size: .9375rem; }
+  #status.warn { color: var(--promo); }
+  .controls { display: none; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0 4px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card); }
+  .seg button {
+    border: 0; background: transparent; color: var(--muted); padding: 9px 12px; cursor: pointer;
+    font: 600 .875rem var(--font);
+  }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .switch { display: inline-flex; align-items: center; gap: 8px; font-size: .9375rem; cursor: pointer; }
+  .switch input { width: 20px; height: 20px; accent-color: var(--ink); }
+
+  /* ---- productos ---- */
+  #results { margin-top: 8px; }
+  .product { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-top: 12px; }
+  .top { display: flex; gap: 12px; align-items: center; }
+  .top img, .top .ph { width: 72px; height: 72px; flex: none; border-radius: 10px; background: #fff; object-fit: contain; }
+  .top .ph { background: var(--line); }
+  .name { font-weight: 700; line-height: 1.25; }
+  .meta { color: var(--muted); font-size: .8125rem; margin-top: 2px; }
+
+  .best { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .tag {
+    display: inline-flex; align-items: baseline; gap: 2px; background: var(--tag); color: var(--tag-ink);
+    padding: 8px 18px 8px 26px; font-family: var(--font); line-height: 1;
+    clip-path: polygon(16px 0, 100% 0, 100% 100%, 16px 100%, 0 50%);
+  }
+  .tag .cur { font-size: 1.125rem; font-weight: 700; margin-right: 4px; }
+  .tag .int { font-size: 2.75rem; font-weight: 850; font-stretch: 72%; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .tag .cts { font-size: 1.125rem; font-weight: 700; align-self: flex-start; margin-top: 3px; }
+  .best-info { min-width: 0; }
+  .best-info .where { font-weight: 700; }
+  .best-info .where a { color: inherit; }
+  .best-info .sub { color: var(--good); font-size: .875rem; font-weight: 600; }
+  .best-info .sub.plain { color: var(--muted); font-weight: 400; }
+  .nostock { margin-top: 12px; color: var(--muted); font-weight: 600; }
+
+  .rows { list-style: none; margin: 10px 0 0; padding: 0; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .row.out { opacity: .6; }
+  .dot {
+    flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--line);
+    display: grid; place-items: center; font-weight: 800; font-size: .8125rem;
+  }
+  .who { flex: 1; min-width: 0; }
+  .who a { font-weight: 600; color: inherit; text-decoration: none; }
+  .who a:hover { text-decoration: underline; }
+  .who small { display: block; color: var(--muted); font-size: .8125rem; }
+  .badge { display: inline-block; font-size: .75rem; font-weight: 700; border-radius: 6px; padding: 2px 6px; margin-left: 6px; vertical-align: 1px; }
+  .badge.promo { background: var(--promo); color: #fff; }
+  @media (prefers-color-scheme: dark) { .badge.promo { color: #2a0008; } }
+  .badge.out { background: var(--line); color: var(--muted); }
+  .amt { text-align: right; flex: none; }
+  .amt b { display: block; font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+  .amt s { color: var(--muted); font-size: .8125rem; margin-right: 6px; }
+  .amt small { color: var(--muted); font-size: .8125rem; }
+  details.more summary { cursor: pointer; padding: 10px 0 2px; color: var(--muted); font-weight: 600; font-size: .9375rem; }
+
+  /* ---- vacío, carga y errores ---- */
+  .empty { text-align: center; padding: 36px 8px 8px; }
+  .empty h2 { font-size: 1.5rem; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .empty p { margin: 0 auto 4px; max-width: 34ch; color: var(--muted); }
+  .skel { height: 164px; border-radius: 14px; margin-top: 12px; background: var(--card); border: 1px solid var(--line); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+  .stores { margin-top: 20px; font-size: .875rem; color: var(--muted); }
+  .stores summary { cursor: pointer; font-weight: 600; }
+  .stores ul { list-style: none; padding: 8px 0 0; margin: 0; display: grid; gap: 4px; }
+  .stores .bad { color: var(--promo); }
+  .link { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; padding: 0; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Comparador de precios de supermercados</h1>
-
-  <form id="form">
-    <input id="q" type="search" placeholder="Nombre o código de barras (ej. 7790070410123)" autocomplete="off" inputmode="search">
-    <button class="primary" type="submit" id="go">Buscar</button>
-    <button type="button" id="scan">Escanear</button>
-  </form>
-  <p class="hint">Si pegás un código de barras (8, 12, 13 o 14 dígitos) se busca el producto exacto en cada tienda.</p>
-
-  <div id="scanner">
-    <video id="video" playsinline muted></video>
-    <p class="hint" id="scanmsg">Apuntá la cámara al código de barras.</p>
-    <button type="button" id="stop">Cerrar cámara</button>
+  <div class="brand">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M14 8h36a4 4 0 0 1 4 4v40a4 4 0 0 1-4 4H14l-8-24z" fill="#ffd21f"/><circle cx="18" cy="32" r="3.5" fill="#14182b"/><text x="34" y="43" text-anchor="middle" font-family="Arial Narrow, Arial, sans-serif" font-weight="800" font-size="30" fill="#1a1400">$</text></svg>
+    <b>Comparador de precios</b>
   </div>
 
-  <div id="status"></div>
+  <form id="form" class="search" role="search">
+    <input id="q" type="search" placeholder="Producto o código" autocomplete="off" enterkeyhint="search" aria-label="Producto o código de barras">
+    <button type="button" class="scan" id="scan" aria-label="Escanear código de barras">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 9v6M10 9v6M13 9v6M17 9v6"/></svg>
+      <span>Escanear</span>
+    </button>
+    <button type="submit" class="go" id="go">Buscar</button>
+  </form>
+
+  <ul class="chips" id="chips"></ul>
+
+  <div id="scanner">
+    <div class="viewfinder"><video id="video" playsinline muted></video></div>
+    <p id="scanmsg">Apuntá la cámara al código de barras del producto.</p>
+    <button type="button" class="chip" id="stop">Cerrar cámara</button>
+  </div>
+
+  <div id="status" role="status" aria-live="polite"></div>
+
+  <div class="controls" id="controls">
+    <div class="seg" role="group" aria-label="Ordenar resultados">
+      <button type="button" data-sort="stores" aria-pressed="true">Más tiendas</button>
+      <button type="button" data-sort="price" aria-pressed="false">Menor precio</button>
+      <button type="button" data-sort="unit" aria-pressed="false">Por kg o litro</button>
+    </div>
+    <label class="switch"><input type="checkbox" id="hideOut"> Ocultar sin stock</label>
+  </div>
+
   <div id="results"></div>
-  <div id="errs" class="errs"></div>
+  <details class="stores" id="stores" hidden></details>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const money = (n) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 }).format(n);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const nf0 = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (n) => "$ " + (Number.isInteger(n) ? nf0.format(n) : nf2.format(n));
+const initials = (s) => s.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, "").slice(0, 2);
+
+const EXAMPLES = ["leche entera", "yerba mate", "aceite de girasol", "fideos tirabuzón", "arroz largo fino"];
+let data = null, sortBy = "stores", hideOut = false;
+
+// ---- búsquedas recientes (solo comodidad; si el navegador no deja guardar, no pasa nada) ----
+function recents() { try { return JSON.parse(localStorage.getItem("recientes") || "[]"); } catch (_) { return []; } }
+function remember(q) {
+  try {
+    const list = [q, ...recents().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 6);
+    localStorage.setItem("recientes", JSON.stringify(list));
+  } catch (_) {}
+}
+function forget() { try { localStorage.removeItem("recientes"); } catch (_) {} renderChips(); }
+function renderChips() {
+  const r = recents();
+  const items = r.length ? r : EXAMPLES;
+  $("chips").innerHTML = items.map((t) => '<li><button type="button" class="chip" data-q="' + esc(t) + '">' + esc(t) + "</button></li>").join("") +
+    (r.length ? '<li><button type="button" class="link" id="clear">Borrar recientes</button></li>' : "");
+  const clear = $("clear"); if (clear) clear.addEventListener("click", forget);
+}
+$("chips").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-q]");
+  if (b) { $("q").value = b.dataset.q; runSearch(b.dataset.q); }
+});
+
+// ---- estados ----
+function showEmpty() {
+  $("status").textContent = ""; $("controls").style.display = "none"; $("stores").hidden = true;
+  $("results").innerHTML = '<div class="empty"><h2>¿Qué querés comparar?</h2>' +
+    "<p>Escribí el nombre de un producto o escaneá su código de barras y te muestro dónde está más barato.</p></div>";
+}
+function showLoading() {
+  $("status").className = ""; $("status").textContent = "Buscando en los supermercados…";
+  $("controls").style.display = "none"; $("stores").hidden = true;
+  $("results").innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+}
 
 async function runSearch(q) {
   q = q.trim();
-  if (q.length < 2) return;
+  if (q.length < 2) { $("q").focus(); return; }
   $("go").disabled = true;
-  $("status").textContent = "Buscando en los supermercados…";
-  $("results").innerHTML = ""; $("errs").textContent = "";
+  showLoading();
   try {
     const r = await fetch("/api/search?q=" + encodeURIComponent(q));
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || "Error al buscar");
-    render(data);
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || "El servidor no pudo completar la búsqueda.");
+    data = body; remember(q); renderChips(); render();
   } catch (e) {
-    $("status").textContent = "No se pudo buscar: " + e.message;
+    $("status").className = "warn";
+    $("status").textContent = "No se pudo buscar. " + (e.message || "Revisá tu conexión y probá de nuevo.");
+    $("results").innerHTML = "";
   } finally {
     $("go").disabled = false;
   }
 }
 
-function render(d) {
-  const ok = d.stores.filter((s) => s.ok).length;
-  const failed = d.stores.filter((s) => !s.ok);
-  if (!d.products.length) {
-    $("status").textContent = ok
-      ? "No encontré resultados para “" + d.query + "”."
-      : "Ninguna tienda respondió. Revisá tu conexión.";
-  } else {
-    $("status").textContent = d.products.length + " producto(s) · " + ok + " de " + d.stores.length + " tiendas respondieron" +
-      (d.mode === "ean" ? " · búsqueda por código de barras" : "");
-  }
-  $("results").innerHTML = d.products.map((p) => {
-    const rows = p.offers.map((o, i) => {
-      const best = o.in_stock && o.store === p.best_store && i === 0 && p.offers.filter(x => x.in_stock).length > 0;
-      const up = o.unit_price ? money(o.unit_price.value) + "/" + o.unit_price.per : "";
-      const old = o.list_price > o.price ? '<span class="old">' + money(o.list_price) + "</span>" : "";
-      return '<tr class="' + (best ? "best" : "") + (o.in_stock ? "" : " out") + '">' +
-        '<td><a href="' + esc(o.url) + '" target="_blank" rel="noopener">' + esc(o.store) + "</a>" +
-        (best ? '<span class="tag">Más barato</span>' : "") +
-        (o.in_stock ? "" : '<span class="tag out">Sin stock</span>') + "</td>" +
-        '<td class="unit">' + up + "</td>" +
-        '<td class="price">' + old + money(o.price) + "</td></tr>";
-    }).join("");
-    return '<section class="product"><div class="head">' +
-      (p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy">' : '<div class="ph"></div>') +
-      '<div><div class="name">' + esc(p.name) + '</div><div class="meta">' +
-      esc([p.brand, p.ean && "EAN " + p.ean].filter(Boolean).join(" · ")) + "</div></div>" +
-      (p.savings_pct > 0 ? '<div class="save">Ahorrás hasta ' + p.savings_pct + "%</div>" : "") +
-      "</div><table>" + rows + "</table></section>";
-  }).join("");
-  $("errs").textContent = failed.length ? "Sin respuesta: " + failed.map((s) => s.store).join(", ") : "";
+// ---- cálculo de vista ----
+const bestOffer = (p) => p.offers.find((o) => o.in_stock) || null;
+function bestUnit(p) {
+  const u = p.offers.filter((o) => o.in_stock && o.unit_price).map((o) => o.unit_price.value);
+  return u.length ? Math.min(...u) : Infinity;
+}
+function view() {
+  let list = data.products.map((p) => ({ ...p, offers: hideOut ? p.offers.filter((o) => o.in_stock) : p.offers })).filter((p) => p.offers.length);
+  if (sortBy === "price") list.sort((a, b) => (bestOffer(a)?.price ?? Infinity) - (bestOffer(b)?.price ?? Infinity));
+  else if (sortBy === "unit") list.sort((a, b) => bestUnit(a) - bestUnit(b));
+  return list;
 }
 
-$("form").addEventListener("submit", (e) => { e.preventDefault(); runSearch($("q").value); });
+function offerRow(o, best) {
+  let diff = "";
+  if (best && o.in_stock && o !== best) {
+    const d = o.price - best.price;
+    diff = "+ " + money(d) + " (+" + Math.round((d / best.price) * 100) + "%)";
+  }
+  const unit = o.unit_price ? money(o.unit_price.value) + " por " + o.unit_price.per : "";
+  return '<li class="row' + (o.in_stock ? "" : " out") + '">' +
+    '<span class="dot" aria-hidden="true">' + esc(initials(o.store)) + "</span>" +
+    '<div class="who"><a href="' + esc(o.url) + '" target="_blank" rel="noopener">' + esc(o.store) + "</a>" +
+    (o.promo ? '<span class="badge promo">' + esc(o.promo) + "</span>" : "") +
+    (o.in_stock ? "" : '<span class="badge out">Sin stock</span>') +
+    (unit ? "<small>" + esc(unit) + "</small>" : "") + "</div>" +
+    '<div class="amt"><b>' + (o.list_price > o.price ? "<s>" + money(o.list_price) + "</s>" : "") + money(o.price) + "</b>" +
+    (diff ? "<small>" + diff + "</small>" : "") + "</div></li>";
+}
 
-// ---- escáner de código de barras (BarcodeDetector: Chrome/Android, Edge, Safari reciente) ----
+function productHTML(p) {
+  const best = bestOffer(p);
+  const others = p.offers.filter((o) => o !== best);
+  const LIMIT = 3;
+  const shown = others.slice(0, LIMIT).map((o) => offerRow(o, best)).join("");
+  const hidden = others.slice(LIMIT);
+  const more = hidden.length
+    ? '<details class="more"><summary>Ver ' + hidden.length + (hidden.length === 1 ? " tienda más" : " tiendas más") + "</summary><ul class=\"rows\">" +
+      hidden.map((o) => offerRow(o, best)).join("") + "</ul></details>" : "";
+  let tag = '<p class="nostock">Sin stock en ninguna tienda.</p>';
+  if (best) {
+    const cents = String(Math.round((best.price % 1) * 100)).padStart(2, "0");
+    const worst = [...p.offers].reverse().find((o) => o.in_stock);
+    const saving = worst && worst !== best ? worst.price - best.price : 0;
+    tag = '<div class="best"><div class="tag" aria-label="' + esc(money(best.price)) + '"><span class="cur">$</span><span class="int">' +
+      nf0.format(Math.floor(best.price)) + '</span><span class="cts">' + cents + "</span></div>" +
+      '<div class="best-info"><div class="where">Más barato en <a href="' + esc(best.url) + '" target="_blank" rel="noopener">' + esc(best.store) + "</a>" +
+      (best.promo ? '<span class="badge promo">' + esc(best.promo) + "</span>" : "") + "</div>" +
+      (saving > 0 ? '<div class="sub">Ahorrás ' + money(saving) + " frente a " + esc(worst.store) + "</div>"
+                  : '<div class="sub plain">Es la única tienda con stock</div>') + "</div></div>";
+  }
+  return '<section class="product"><div class="top">' +
+    (p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=ph></div>\'">' : '<div class="ph"></div>') +
+    '<div><div class="name">' + esc(p.name) + '</div>' +
+    (p.brand ? '<div class="meta">' + esc(p.brand) + "</div>" : "") +
+    (p.ean ? '<div class="meta">Código ' + esc(p.ean) + "</div>" : "") + "</div></div>" +
+    tag + (shown ? '<ul class="rows">' + shown + "</ul>" : "") + more + "</section>";
+}
+
+function render() {
+  const list = view();
+  const ok = data.stores.filter((s) => s.ok), bad = data.stores.filter((s) => !s.ok);
+  const st = $("status");
+  st.className = "";
+  if (!ok.length) {
+    st.className = "warn"; st.textContent = "Ninguna tienda respondió. Revisá tu conexión y probá de nuevo.";
+  } else if (!list.length) {
+    st.textContent = "No encontré “" + data.query + "”. Probá con otra palabra o con el código de barras.";
+  } else {
+    st.textContent = list.length + (list.length === 1 ? " producto" : " productos") + " en " + ok.length + " de " + data.stores.length + " tiendas" +
+      (data.mode === "ean" ? ", buscado por código de barras" : "") + ".";
+  }
+  $("controls").style.display = list.length ? "flex" : "none";
+  $("results").innerHTML = list.map(productHTML).join("");
+
+  const box = $("stores");
+  box.hidden = false;
+  box.innerHTML = "<summary>" + (bad.length ? "Sin datos de " + bad.map((s) => esc(s.store)).join(", ") : "Tiendas consultadas") + "</summary><ul>" +
+    data.stores.map((s) => s.ok
+      ? "<li>" + esc(s.store) + ": " + s.count + (s.count === 1 ? " resultado" : " resultados") + "</li>"
+      : '<li class="bad">' + esc(s.store) + ": " + esc(s.error || "no respondió") + "</li>").join("") + "</ul>";
+}
+
+// ---- eventos ----
+$("form").addEventListener("submit", (e) => { e.preventDefault(); runSearch($("q").value); });
+document.querySelectorAll("[data-sort]").forEach((b) => b.addEventListener("click", () => {
+  sortBy = b.dataset.sort;
+  document.querySelectorAll("[data-sort]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  if (data) render();
+}));
+$("hideOut").addEventListener("change", (e) => { hideOut = e.target.checked; if (data) render(); });
+
+// ---- escáner de código de barras (BarcodeDetector: Chrome en Android y PC, Safari reciente) ----
 let stream = null, timer = null;
 function stopScan() {
   clearInterval(timer); timer = null;
@@ -156,20 +364,22 @@ function stopScan() {
 }
 $("stop").addEventListener("click", stopScan);
 $("scan").addEventListener("click", async () => {
+  const st = $("status"); st.className = "warn";
   if (!("BarcodeDetector" in window)) {
-    $("status").textContent = "Este navegador no soporta escaneo. Escribí el código a mano o probá con Chrome en el celular.";
+    st.textContent = "Este navegador no puede escanear. Escribí el número que está debajo de las barras.";
     return;
   }
   if (!window.isSecureContext) {
-    $("status").textContent = "La cámara solo funciona en https o en localhost.";
+    st.textContent = "La cámara solo funciona desde una dirección https o desde localhost.";
     return;
   }
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
   } catch (e) {
-    $("status").textContent = "No pude acceder a la cámara: " + e.message;
+    st.textContent = "No pude abrir la cámara. Permití el acceso en el navegador o escribí el número a mano.";
     return;
   }
+  st.className = ""; st.textContent = "";
   const video = $("video");
   video.srcObject = stream; await video.play();
   $("scanner").style.display = "block";
@@ -180,12 +390,16 @@ $("scan").addEventListener("click", async () => {
       if (codes.length) {
         const value = codes[0].rawValue;
         stopScan();
+        if (navigator.vibrate) navigator.vibrate(60);
         $("q").value = value;
         runSearch(value);
       }
-    } catch (_) { /* frame no listo */ }
+    } catch (_) { /* el cuadro todavía no está listo */ }
   }, 300);
 });
+
+renderChips();
+showEmpty();
 </script>
 </body>
 </html>
