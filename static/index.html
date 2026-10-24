@@ -126,6 +126,9 @@
   .tag .cur { font-size: 1.125rem; font-weight: 700; margin-right: 4px; }
   .tag .int { font-size: 2.75rem; font-weight: 850; font-stretch: 72%; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
   .tag .cts { font-size: 1.125rem; font-weight: 700; align-self: flex-start; margin-top: 3px; }
+  .bestwhere { flex: 1 1 100%; font-size: 1.0625rem; font-weight: 800; }
+  .bestwhere a { color: inherit; }
+  .bestnote { margin-left: 8px; color: var(--muted); font-size: .875rem; font-weight: 500; }
   .best-info { min-width: 0; }
   .best-info .where { font-weight: 700; }
   .best-info .where a { color: inherit; }
@@ -531,12 +534,14 @@ function productHTML(p, idx) {
     const cents = String(Math.round((best.price % 1) * 100)).padStart(2, "0");
     const worst = [...p.offers].reverse().find((o) => o.in_stock);
     const saving = worst && worst !== best ? worst.price - best.price : 0;
-    tag = '<div class="best"><div class="tag" aria-label="' + esc(money(best.price)) + '"><span class="cur">$</span><span class="int">' +
-      nf0.format(Math.floor(best.price)) + '</span><span class="cts">' + cents + "</span></div>" +
-      '<div class="best-info"><div class="where">Más barato en <a href="' + esc(best.url) + '" target="_blank" rel="noopener">' + esc(best.store) + "</a>" +
+    const multi = p.offers.filter((o) => o.in_stock).length > 1;
+    // Primero dónde y cuánto sale; la diferencia con las otras tiendas va en segundo lugar.
+    tag = '<div class="best"><div class="bestwhere"><a href="' + esc(best.url) + '" target="_blank" rel="noopener">' + esc(best.store) + "</a>" +
+      '<span class="bestnote">' + (multi ? "precio más bajo" : "solo la encontramos con stock acá") + "</span>" +
       (best.promo ? '<span class="badge promo">' + esc(best.promo) + "</span>" : "") + "</div>" +
-      (saving > 0 ? '<div class="sub">Ahorrás ' + money(saving) + " frente a " + esc(worst.store) + "</div>"
-                  : '<div class="sub plain">Es la única tienda con stock</div>') + "</div></div>";
+      '<div class="tag" role="img" aria-label="Precio en ' + esc(best.store) + ": " + esc(money(best.price)) + '"><span class="cur">$</span><span class="int">' +
+      nf0.format(Math.floor(best.price)) + '</span><span class="cts">' + cents + "</span></div>" +
+      (saving > 0 ? '<div class="best-info"><div class="sub">Ahorrás ' + money(saving) + " frente a " + esc(worst.store) + "</div></div>" : "") + "</div>";
   }
   const add = p.ean
     ? '<div class="actions"><button type="button" class="btn addlist' + (inList(p.ean) ? " on" : "") + '" data-add="' + idx + '">' +

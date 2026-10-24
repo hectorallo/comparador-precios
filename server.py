@@ -51,7 +51,7 @@ COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
-VERSION = "2026-10-24-e"
+VERSION = "2026-10-24-f"
 
 TIMEOUT = 10          # segundos por tienda
 CACHE_TTL = 600       # 10 minutos
@@ -398,10 +398,26 @@ def api_debug_coto():
         return jsonify(error="desactivado"), 404
     q = request.args.get("q", "leche")
     try:
-        raw = _coto_request(q, 2)
+        raw = _coto_request(q, 3)
     except Exception as e:
         return jsonify(error=str(e)), 502
-    return jsonify(results=raw[:2])
+    out = []
+    for it in raw[:3]:
+        d = it.get("data") or {}
+        out.append({
+            "nombre": it.get("value"),
+            "ean": d.get("product_main_ean"),
+            "precio_que_usa_la_app": _coto_price(d),
+            "price_crudo": d.get("price"),
+            "product_list_price": d.get("product_list_price"),
+            "discounts": d.get("discounts"),
+            "product_format": d.get("product_format"),
+            "product_format_quantity": d.get("product_format_quantity"),
+            "product_unit_of_measure": d.get("product_unit_of_measure"),
+            "sucursal_usada": COTO_STORE_ID,
+            "campos_disponibles": sorted(d.keys()),
+        })
+    return jsonify(resultados=out)
 
 
 @app.get("/")
