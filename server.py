@@ -51,7 +51,7 @@ COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
-VERSION = "2026-10-24-k"
+VERSION = "2026-10-25-a"
 
 TIMEOUT = 10          # segundos por tienda
 CACHE_TTL = 600       # 10 minutos

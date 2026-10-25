@@ -221,6 +221,8 @@
   .item .now .sub-total { display: block; font-weight: 700; color: var(--ink); margin-top: 4px; }
   .item .now .warnline { display: block; color: var(--promo); margin-bottom: 4px; }
   .item .now .badge { margin-left: 6px; }
+  .manrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line, rgba(128,128,128,.25)); }
+  .manrow small { display: block; opacity: .75; font-size: .8125rem; }
   .totop { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 6; width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); box-shadow: 0 2px 10px rgba(0,0,0,.3); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transform: translateY(12px); pointer-events: none; transition: opacity .2s, transform .2s; }
   .totop.show { opacity: 1; transform: none; pointer-events: auto; }
   .totop svg { width: 22px; height: 22px; }
@@ -309,6 +311,12 @@
     <div class="progress" id="progress" hidden><i></i></div>
     <div id="items"></div>
     <div id="summary" class="summary"></div>
+
+    <details class="backup" id="manadmin">
+      <summary id="manadmin-sum">Precios cargados a mano</summary>
+      <p class="fine">Estos precios no se actualizan solos y pueden estar viejos. Podés borrar todos los de una tienda juntos.</p>
+      <div id="manlist"></div>
+    </details>
 
     <details class="backup">
       <summary>Copia de seguridad</summary>
@@ -699,7 +707,7 @@ $("results").addEventListener("submit", (e) => {
   const k = canon(f.dataset.ean);
   const list = (manuales[k] || []).filter((m) => m.store.toLowerCase() !== store.toLowerCase());
   list.push({ store, price, units, date: today() });
-  manuales[k] = list; saveManuales();
+  manuales[k] = list; saveManuales(); renderManAdmin();
   if (data) render();
 });
 $("results").addEventListener("click", (e) => {
@@ -707,7 +715,7 @@ $("results").addEventListener("click", (e) => {
   const k = canon(b.dataset.ean);
   manuales[k] = (manuales[k] || []).filter((m) => m.store !== b.dataset.store);
   if (!manuales[k].length) delete manuales[k];
-  saveManuales();
+  saveManuales(); renderManAdmin();
   if (data) render();
 });
 
@@ -865,6 +873,41 @@ $("check").addEventListener("click", async () => {
   renderList();
 });
 
+// ---- administrar precios cargados a mano (borrar por tienda) ----
+function renderManAdmin() {
+  const by = {};
+  Object.values(manuales).forEach((a) => a.forEach((m) => {
+    const o = by[m.store] || (by[m.store] = { n: 0, oldest: "" });
+    o.n++; if (!o.oldest || (m.date && m.date < o.oldest)) o.oldest = m.date;
+  }));
+  const names = Object.keys(by).sort();
+  const total = names.reduce((t, n) => t + by[n].n, 0);
+  $("manadmin-sum").textContent = "Precios cargados a mano" + (total ? " (" + total + ")" : "");
+  if (!names.length) { $("manlist").innerHTML = '<p class="fine">No cargaste ningún precio todavía.</p>'; return; }
+  $("manlist").innerHTML = names.map((n) => {
+    const d = by[n].oldest ? new Date(by[n].oldest + "T00:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
+    return '<div class="manrow"><div><b>' + esc(n) + "</b><small>" + by[n].n + (by[n].n === 1 ? " precio" : " precios") + (d ? ", el más viejo del " + d : "") +
+      '</small></div><button type="button" class="btn" data-delstore="' + esc(n) + '">Borrar todos</button></div>';
+  }).join("") + (names.length > 1 ? '<div class="actions"><button type="button" class="btn" data-delall="1">Borrar todos los de todas las tiendas</button></div>' : "");
+}
+$("manlist").addEventListener("click", (e) => {
+  const one = e.target.closest("[data-delstore]"), all = e.target.closest("[data-delall]");
+  if (!one && !all) return;
+  const store = one && one.dataset.delstore;
+  if (!confirm(all ? "¿Borrar todos los precios cargados a mano?" : "¿Borrar todos los precios cargados de " + store + "?")) return;
+  for (const k of Object.keys(manuales)) {
+    manuales[k] = all ? [] : manuales[k].filter((m) => m.store !== store);
+    if (!manuales[k].length) delete manuales[k];
+  }
+  saveManuales(); afterManualChange();
+});
+function afterManualChange() {
+  renderManAdmin();
+  if (data) render();
+  checked = {}; renderList();
+  if (typeof renderCart === "function") renderCart();
+}
+
 // ---- copia de seguridad ----
 $("export").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify({ version: 2, lista: myList, historial: history, manuales })], { type: "application/json" });
@@ -884,7 +927,7 @@ $("file").addEventListener("change", async (e) => {
     history = d.historial;
     manuales = sanitizeManuales(d.manuales);   // copias viejas no traen precios cargados: queda vacío
     save("lista-v1", myList); save("historial-v1", history); saveManuales();
-    checked = {}; renderList();
+    checked = {}; renderList(); renderManAdmin();
     $("lstatus").className = "status"; $("lstatus").textContent = "Copia cargada: " + myList.length + " productos en tu lista.";
   } catch (_) {
     $("lstatus").className = "status warn"; $("lstatus").textContent = "Ese archivo no es una copia válida de esta app.";
@@ -1129,6 +1172,7 @@ $("scan").addEventListener("click", async () => {
   setInterval(upd, 700);
   upd();
 })();
+renderManAdmin();
 renderChips(); updateCount(); showEmpty();
 </script>
 </body>
