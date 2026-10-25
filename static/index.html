@@ -183,6 +183,8 @@
   .item .info .name { font-size: .9375rem; }
   .item .now { font-size: .8125rem; color: var(--muted); margin-top: 2px; }
   .item .now b { color: var(--ink); }
+  .item.off .info, .item.off img, .item.off .ph { opacity: .45; }
+  .item.off .qty { border-color: var(--ink); }
   .qty { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; flex: none; }
   .qty button { width: 34px; height: 36px; border: 0; background: transparent; color: var(--ink); font-size: 1.25rem; cursor: pointer; }
   .qty span { min-width: 24px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -741,15 +743,15 @@ function itemHTML(it) {
     const o = mergedOffers(it)[0];
     now = o ? 'Mejor hoy: <b>' + money(o.price) + "</b> en " + esc(o.store) : "Sin stock en ninguna tienda";
   }
-  return '<div class="item" data-k="' + esc(canon(it.ean)) + '">' +
+  return '<div class="item' + (it.qty === 0 ? ' off' : '') + '" data-k="' + esc(canon(it.ean)) + '">' +
     (it.image ? '<img src="' + esc(it.image) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=ph></div>\'">' : '<div class="ph"></div>') +
-    '<div class="info"><div class="name">' + esc(it.name) + "</div>" + (now ? '<div class="now">' + now + "</div>" : "") + "</div>" +
+    '<div class="info"><div class="name">' + esc(it.name) + "</div>" + (it.qty === 0 ? '<div class="now">No la compro esta vez</div>' : now ? '<div class="now">' + now + "</div>" : "") + "</div>" +
     '<div class="qty"><button type="button" data-q="-1" aria-label="Menos unidades">−</button><span aria-live="polite">' + it.qty + '</span><button type="button" data-q="1" aria-label="Más unidades">+</button></div>' +
     '<button type="button" class="rm" data-rm aria-label="Quitar de la lista">✕</button></div>';
 }
 
 function planFor() {
-  const rows = myList.map((it) => ({ it, offers: mergedOffers(it) }));
+  const rows = myList.filter((it) => it.qty > 0).map((it) => ({ it, offers: mergedOffers(it) }));
   const needed = rows.filter((r) => r.offers.length);
   const names = [...new Set(needed.flatMap((r) => r.offers.map((o) => o.store)))].filter((s) => !failedStores.has(s));
   const totals = names.map((s) => {
@@ -775,7 +777,7 @@ function planFor() {
 function summaryHTML() {
   if (!Object.keys(checked).length) return "";
   const pl = planFor();
-  if (!pl.needed.length) return '<p class="fine">Ningún producto de la lista tiene stock en las tiendas consultadas.</p>';
+  if (!pl.needed.length) return '<p class="fine">' + (myList.some((x) => x.qty > 0) ? "Ningún producto de la lista tiene stock en las tiendas consultadas." : "Todos los productos están en 0: subí la cantidad de los que vas a comprar.") + "</p>";
   const bestSingle = pl.complete[0];
   const stopNames = Object.keys(pl.stops).sort((a, b) => pl.stops[b].sub - pl.stops[a].sub);
   let html = '<div class="plan"><h3>Lo más barato de toda tu lista</h3><div class="big"><b>' + money(pl.splitTotal) + "</b>";
@@ -829,7 +831,7 @@ $("items").addEventListener("click", (e) => {
   const it = myList.find((x) => canon(x.ean) === row.dataset.k);
   if (!it) return;
   const q = e.target.closest("[data-q]");
-  if (q) it.qty = Math.min(99, Math.max(1, it.qty + Number(q.dataset.q)));
+  if (q) it.qty = Math.min(99, Math.max(0, it.qty + Number(q.dataset.q)));
   else if (e.target.closest("[data-rm]")) myList = myList.filter((x) => x !== it);
   else return;
   save("lista-v1", myList);
@@ -923,7 +925,7 @@ $("file").addEventListener("change", async (e) => {
   try {
     const d = JSON.parse(await f.text());
     if (!Array.isArray(d.lista) || typeof d.historial !== "object") throw new Error();
-    myList = d.lista.filter((x) => x && x.ean && x.name).map((x) => ({ ean: String(x.ean), name: String(x.name), brand: String(x.brand || ""), image: String(x.image || ""), qty: Math.min(99, Math.max(1, Number(x.qty) || 1)) }));
+    myList = d.lista.filter((x) => x && x.ean && x.name).map((x) => ({ ean: String(x.ean), name: String(x.name), brand: String(x.brand || ""), image: String(x.image || ""), qty: Number.isFinite(Number(x.qty)) ? Math.min(99, Math.max(0, Math.round(Number(x.qty)))) : 1 }));
     history = d.historial;
     manuales = sanitizeManuales(d.manuales);   // copias viejas no traen precios cargados: queda vacío
     save("lista-v1", myList); save("historial-v1", history); saveManuales();
