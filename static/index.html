@@ -221,6 +221,9 @@
   .item .now .sub-total { display: block; font-weight: 700; color: var(--ink); margin-top: 4px; }
   .item .now .warnline { display: block; color: var(--promo); margin-bottom: 4px; }
   .item .now .badge { margin-left: 6px; }
+  .totop { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 6; width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); box-shadow: 0 2px 10px rgba(0,0,0,.3); cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transform: translateY(12px); pointer-events: none; transition: opacity .2s, transform .2s; }
+  .totop.show { opacity: 1; transform: none; pointer-events: auto; }
+  .totop svg { width: 22px; height: 22px; }
   .totalbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--ink); color: var(--paper); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
   .totalbar .in { max-width: 720px; margin: 0 auto; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .totalbar b { font-size: 1.75rem; font-weight: 850; font-stretch: 80%; font-variant-numeric: tabular-nums; }
@@ -346,6 +349,7 @@
   <div class="in"><div><small id="tbsub"></small><br><small>Total aproximado</small></div><b id="tbtotal"></b></div>
 </div>
 
+<button class="totop" id="totop" type="button" aria-label="Volver arriba"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1113,6 +1117,18 @@ $("scan").addEventListener("click", async () => {
   }, 300);
 });
 
+(function () {
+  const b = document.getElementById("totop"), bar = document.getElementById("totalbar");
+  function upd() {
+    b.classList.toggle("show", window.scrollY > 400);
+    b.style.bottom = bar && !bar.hidden ? (bar.offsetHeight + 16) + "px" : "";
+  }
+  window.addEventListener("scroll", upd, { passive: true });
+  window.addEventListener("resize", upd);
+  b.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  setInterval(upd, 700);
+  upd();
+})();
 renderChips(); updateCount(); showEmpty();
 </script>
 </body>
