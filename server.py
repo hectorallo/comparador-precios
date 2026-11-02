@@ -1,10 +1,9 @@
 """Comparador de precios de supermercados (Argentina).
 
 Consulta en paralelo:
-  - Tiendas VTEX (Carrefour, Jumbo, Disco, Vea, Día, ChangoMás), por código de
-    barras (EAN) o por nombre.
-  - Coto Digital, que usa el buscador Constructor.io (necesita la variable de
-    entorno COTO_KEY, ver README).
+  - Tiendas VTEX (Carrefour, Jumbo, Disco, Vea, Día, ChangoMás, Toledo), por
+    código de barras (EAN) o por nombre.
+  - Coto Digital, que usa el buscador Constructor.io (necesita COTO_KEY).
 
 Agrupa los resultados por producto (mismo EAN) para poder comparar.
 
@@ -12,19 +11,27 @@ Uso:  python server.py   ->  http://localhost:8000
 """
 import concurrent.futures as cf
 import json
+import logging
 import os
 import re
+import threading
 import time
 import uuid
+from collections import defaultdict, deque
 from pathlib import Path
 from urllib.parse import quote
 
 import requests
+from cachetools import TTLCache
 from flask import Flask, Response, jsonify, request, send_from_directory
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("comparador")
 
 # ---------- configuración ----------
 
-# Tiendas VTEX. Para agregar otra, sumá una línea acá.
 STORES = {
     "Carrefour": "https://www.carrefour.com.ar",
     "Jumbo": "https://www.jumbo.com.ar",
@@ -35,62 +42,80 @@ STORES = {
     "Toledo": "https://www.toledodigital.com.ar",
 }
 
-# Coto (Constructor.io). La clave es la clave pública que el sitio de Coto
-# manda desde el navegador; ver README para encontrarla.
 def _clean_key(raw):
-    """Acepta la clave pegada con comillas, con 'key=' adelante o con '&...' atrás."""
     k = (raw or "").strip().strip("\"'")
     if k.lower().startswith("key="):
         k = k[4:]
     return k.split("&")[0].strip()
 
-
 COTO_KEY = _clean_key(os.environ.get("COTO_KEY"))
-COTO_STORE_ID = os.environ.get("COTO_STORE_ID", "238").strip()  # sucursal de referencia (238 = Mar del Plata)
+COTO_STORE_ID = os.environ.get("COTO_STORE_ID", "238").strip()
 COTO_API = "https://ac.cnstrc.com"
 COTO_SITE = "https://www.cotodigital.com.ar/sitios/cdigi/productos/"
 COTO_CLIENT_ID = str(uuid.uuid4())
 
-VERSION = "2026-10-25-b"
+VERSION = os.environ.get("APP_VERSION", "2026-11-02-a")
 
-TIMEOUT = 10          # segundos por tienda
-CACHE_TTL = 600       # 10 minutos
-MAX_PER_STORE = 8     # resultados por tienda en búsqueda por nombre
+TIMEOUT = (4, 10)          # (connect, read)
+CACHE_TTL = 600            # 10 minutos
+CACHE_MAX = 512
+MAX_PER_STORE = 8
+RATE_LIMIT = 30            # consultas
+RATE_WINDOW = 60           # por minuto, por IP
 
-SESSION = requests.Session()
-SESSION.headers.update({
-    "User-Agent": "Mozilla/5.0 (compatible; comparador-precios/1.1)",
-    "Accept": "application/json",
-})
+# ---------- sesión por hilo (requests.Session no es thread-safe) ----------
+
+_local = threading.local()
+
+def get_session():
+    s = getattr(_local, "session", None)
+    if s is None:
+        s = requests.Session()
+        retry = Retry(
+            total=3, backoff_factor=0.4,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset(["GET"]),
+            respect_retry_after_header=True,
+        )
+        s.mount("https://", HTTPAdapter(max_retries=retry, pool_maxsize=16))
+        s.headers.update({
+            "User-Agent": "comparador-precios/1.2 (+https://github.com/hectorallo/comparador-precios)",
+            "Accept": "application/json",
+        })
+        _local.session = s
+    return s
 
 app = Flask(__name__, static_folder="static")
-_cache = {}
+_cache = TTLCache(maxsize=CACHE_MAX, ttl=CACHE_TTL)
 
+# rate limit simple por IP
+_hits = defaultdict(deque)
+def rate_ok(ip, limit=RATE_LIMIT, window=RATE_WINDOW):
+    now = time.time()
+    q = _hits[ip]
+    while q and now - q[0] > window:
+        q.popleft()
+    if len(q) >= limit:
+        return False
+    q.append(now)
+    return True
 
 # ---------- utilidades ----------
 
-def is_ean(q: str) -> bool:
-    """True si parece un código de barras (EAN-8/UPC-12/EAN-13/GTIN-14)."""
+def is_ean(q):
     return q.isdigit() and len(q) in (8, 12, 13, 14)
 
-
 def canon(ean):
-    """Código sin ceros a la izquierda: EAN-13 y GTIN-14 del mismo producto coinciden."""
     return str(ean or "").strip().lstrip("0") or None
 
-
 def _s(v):
-    """Texto limpio aunque el dato venga como número, lista o vacío."""
     if v is None or isinstance(v, (dict, list)):
         return ""
     return str(v).strip()
 
-
 UNIT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(kgs?|grs?|g|lts?|l|ml|cc)\b", re.I)
 
-
-def unit_price(name: str, price: float):
-    """Precio por kg o por litro, estimado desde el nombre (ej. 'Leche 1 L')."""
+def unit_price(name, price):
     m = UNIT_RE.search(name or "")
     if not m or not price:
         return None
@@ -108,9 +133,7 @@ def unit_price(name: str, price: float):
         return None
     return {"value": round(price / qty, 2), "per": base}
 
-
 def _num(v):
-    """Convierte 1234.5, '1234.5' o '1.234,50' en float; None si no se puede."""
     if isinstance(v, (int, float)):
         return float(v)
     if isinstance(v, str):
@@ -123,9 +146,7 @@ def _num(v):
             return None
     return None
 
-
 def _as_list(v):
-    """Constructor a veces devuelve listas/objetos como texto JSON."""
     if isinstance(v, str):
         try:
             v = json.loads(v)
@@ -135,12 +156,12 @@ def _as_list(v):
         return [v]
     return v if isinstance(v, list) else []
 
-
 # ---------- tiendas VTEX ----------
 
 def parse_products(store, base, data, wanted_ean=None):
     out = []
     for p in data or []:
+        best = None
         for item in p.get("items", []):
             ean = _s(item.get("ean")) or None
             if wanted_ean and ean and canon(ean) != canon(wanted_ean):
@@ -150,40 +171,46 @@ def parse_products(store, base, data, wanted_ean=None):
             price = offer.get("Price") or 0
             if not price:
                 continue
-            images = item.get("images") or []
-            link = p.get("link") or ""
-            if link.startswith("/"):
-                link = base + link
-            elif not link and p.get("linkText"):
-                link = f"{base}/{p['linkText']}/p"
-            name = p.get("productName") or item.get("name") or ""
-            list_price = offer.get("ListPrice") or price
-            out.append({
-                "store": store,
-                "ean": ean,
-                "name": name,
-                "brand": p.get("brand"),
-                "image": images[0].get("imageUrl") if images else None,
-                "price": round(float(price), 2),
-                "list_price": round(float(list_price), 2),
-                "in_stock": (offer.get("AvailableQuantity") or 0) > 0,
-                "url": link or base,
-                "promo": None,
-                "unit_price": unit_price(name, float(price)),
-            })
-            break  # una variante por producto alcanza
+            in_stock = (offer.get("AvailableQuantity") or 0) > 0
+            if best is None:
+                best = (price, item, ean, offer, in_stock)
+            else:
+                b_price, _, _, _, b_stock = best
+                if (in_stock and not b_stock) or (in_stock == b_stock and price < b_price):
+                    best = (price, item, ean, offer, in_stock)
+        if not best:
+            continue
+        price, item, ean, offer, in_stock = best
+        images = item.get("images") or []
+        link = p.get("link") or ""
+        if link.startswith("/"):
+            link = base + link
+        elif not link and p.get("linkText"):
+            link = f"{base}/{p['linkText']}/p"
+        name = p.get("productName") or item.get("name") or ""
+        list_price = offer.get("ListPrice") or price
+        out.append({
+            "store": store,
+            "ean": ean,
+            "name": name,
+            "brand": p.get("brand"),
+            "image": images[0].get("imageUrl") if images else None,
+            "price": round(float(price), 2),
+            "list_price": round(float(list_price), 2),
+            "in_stock": in_stock,
+            "url": link or base,
+            "promo": None,
+            "unit_price": unit_price(name, float(price)),
+        })
     return out
-
 
 def _vtex_get(base, params, path_term=None):
     url = f"{base}/api/catalog_system/pub/products/search"
     if path_term:
         url += "/" + quote(path_term, safe="")
-    return SESSION.get(url, params=params, timeout=TIMEOUT)
-
+    return get_session().get(url, params=params, timeout=TIMEOUT)
 
 def _reason(r):
-    """Motivo del error que informa la tienda, en una línea corta."""
     try:
         j = r.json()
         msg = (j.get("message") or j.get("Message") or j.get("error") or r.text) if isinstance(j, dict) else r.text
@@ -191,9 +218,7 @@ def _reason(r):
         msg = r.text
     return " ".join(str(msg).split())[:90]
 
-
 def _vtex_try(base, attempts):
-    """Prueba distintas formas de hacer el mismo pedido; si todas fallan, informa el motivo."""
     first = None
     for params, term in attempts:
         r = _vtex_get(base, params, term)
@@ -205,17 +230,13 @@ def _vtex_try(base, attempts):
             break
     raise RuntimeError(first)
 
-
 def _name_attempts(q):
     rng = {"_from": 0, "_to": MAX_PER_STORE - 1}
     return [({"ft": q, **rng}, None), ({"ft": q}, None), (rng, q)]
 
-
 def fetch_store(store, base, q, by_ean):
     if not by_ean:
         return parse_products(store, base, _vtex_try(base, _name_attempts(q)), None)
-    # El mismo producto puede estar cargado como GTIN-14 (con un 0 adelante),
-    # EAN-13 o UPC-12: se prueban las variantes hasta encontrarlo.
     variants = [q]
     if len(q) == 14 and q.startswith("0"):
         variants.append(q[1:])
@@ -228,14 +249,12 @@ def fetch_store(store, base, q, by_ean):
             return found
     return []
 
-
 # ---------- Coto (Constructor.io) ----------
 
 def _coto_request(term, per_page):
     if not COTO_KEY:
         raise RuntimeError("falta configurar COTO_KEY (ver README)")
     base = {"key": COTO_KEY, "num_results_per_page": per_page, "page": 1}
-    # Si el pedido completo da 400, se reintenta con menos parámetros.
     attempts = [
         {**base, "i": COTO_CLIENT_ID, "s": 1, "c": "ciojs-client-2.35.2"},
         {**base, "i": COTO_CLIENT_ID},
@@ -245,7 +264,7 @@ def _coto_request(term, per_page):
     url = f"{COTO_API}/search/{quote(term, safe='')}"
     first_problem = None
     for params in attempts:
-        r = SESSION.get(url, params=params, headers=headers, timeout=TIMEOUT)
+        r = get_session().get(url, params=params, headers=headers, timeout=TIMEOUT)
         if r.status_code == 200:
             return (r.json().get("response") or {}).get("results") or []
         if r.status_code in (401, 403):
@@ -260,14 +279,10 @@ def _coto_request(term, per_page):
             break
     raise RuntimeError(first_problem)
 
-
 def _coto_price(data):
-    """Precio de lista en la sucursal de referencia."""
     entries = [e for e in _as_list(data.get("price")) if isinstance(e, dict)]
     chosen = next((e for e in entries if str(e.get("store")) == COTO_STORE_ID), None)
     if chosen is None and entries:
-        # Hay precios, pero ninguno de la sucursal de referencia: el producto no se vende ahí.
-        # No se usa el precio de otra sucursal (puede ser de otra región o estar desactualizado).
         return None
     if chosen:
         for k in ("listPrice", "list_price", "price_list"):
@@ -276,25 +291,21 @@ def _coto_price(data):
                 return v
     return _num(data.get("product_list_price"))
 
-
 def _coto_available(data):
-    """Coto informa la lista de sucursales donde hay stock. Lista vacía = producto
-    descontinuado (sigue en el catálogo con un precio viejo): no está disponible."""
     val = data.get("store_availability")
     if val is None:
-        return True  # sin dato: asumimos disponible
+        return True
     if isinstance(val, bool):
         return val
     if isinstance(val, str):
         try:
             val = json.loads(val)
         except ValueError:
-            pass  # texto suelto, se busca la sucursal dentro del texto
+            pass
     text = val if isinstance(val, str) else json.dumps(val)
     if text.strip() in ("", "[]", "{}", "null"):
         return False
     return re.search(r"(?<!\d)" + re.escape(COTO_STORE_ID) + r"(?!\d)", text) is not None
-
 
 def _coto_promo(data):
     for d in _as_list(data.get("discounts")):
@@ -303,7 +314,6 @@ def _coto_promo(data):
             if text:
                 return str(text)
     return None
-
 
 def parse_coto(results, wanted_ean=None):
     out = []
@@ -334,22 +344,18 @@ def parse_coto(results, wanted_ean=None):
         })
     return out
 
-
 def fetch_coto(q, by_ean):
     if not by_ean:
         return parse_coto(_coto_request(q, MAX_PER_STORE))
-    # Coto guarda los códigos como GTIN-14 (con ceros a la izquierda)
     for term in dict.fromkeys([q, q.zfill(14)]):
         found = parse_coto(_coto_request(term, 20), wanted_ean=q)
         if found:
             return found[:1]
     return []
 
-
 # ---------- agrupar y buscar ----------
 
 def group_products(results):
-    """Agrupa ofertas del mismo producto (mismo EAN) de distintas tiendas."""
     groups = {}
     for r in results:
         key = canon(r["ean"]) or f"{r['store']}::{r['name']}"
@@ -359,7 +365,6 @@ def group_products(results):
         })
         if not g["image"] and r["image"]:
             g["image"] = r["image"]
-        # mostrar la forma más corta del código (EAN-13 antes que GTIN-14)
         if r["ean"] and (not g["ean"] or len(r["ean"]) < len(g["ean"])):
             g["ean"] = r["ean"]
         g["offers"].append({k: r[k] for k in (
@@ -379,13 +384,12 @@ def group_products(results):
     out.sort(key=lambda g: (-len(g["offers"]), g["offers"][0]["price"]))
     return out
 
-
 def search(q):
     by_ean = is_ean(q)
     key = (q.lower(), by_ean)
     hit = _cache.get(key)
-    if hit and time.time() - hit[0] < CACHE_TTL:
-        return hit[1]
+    if hit:
+        return {**hit, "cached": True}
 
     jobs = {s: (fetch_store, (s, b, q, by_ean)) for s, b in STORES.items()}
     jobs["Coto"] = (lambda: fetch_coto(q, by_ean), ())
@@ -399,7 +403,8 @@ def search(q):
                 res = fut.result()
                 results.extend(res)
                 stores_status.append({"store": s, "ok": True, "count": len(res)})
-            except Exception as e:  # una tienda caída no rompe el resto
+            except Exception as e:
+                log.warning("tienda %s falló: %s", s, e)
                 stores_status.append({"store": s, "ok": False, "error": str(e)[:140]})
     stores_status.sort(key=lambda s: s["store"])
 
@@ -408,32 +413,35 @@ def search(q):
         "mode": "ean" if by_ean else "name",
         "products": group_products(results),
         "stores": stores_status,
+        "cached": False,
     }
-    # no cachear si falló todo (probablemente un problema de red)
     if any(s["ok"] for s in stores_status):
-        _cache[key] = (time.time(), payload)
+        _cache[key] = {k: v for k, v in payload.items() if k != "cached"}
     return payload
-
 
 # ---------- rutas ----------
 
 @app.get("/api/search")
 def api_search():
+    ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "")
+          .split(",")[0].strip())
+    if not rate_ok(ip):
+        return jsonify(error="Demasiadas consultas, esperá un momento."), 429
     q = re.sub(r"\s+", " ", request.args.get("q", "")).strip()
     if len(q) < 2:
         return jsonify(error="Escribí al menos 2 letras o un código de barras."), 400
     return jsonify(search(q))
 
-
 @app.get("/api/version")
 def api_version():
-    """Sirve para comprobar qué versión del programa está publicada."""
     return jsonify(version=VERSION, coto_key_cargada=bool(COTO_KEY))
 
+@app.get("/api/health")
+def api_health():
+    return jsonify(ok=True)
 
 @app.get("/api/debug/tienda")
 def api_debug_tienda():
-    """Muestra qué responde una tienda VTEX a cada forma de pedido. Solo con DEBUG_COTO=1."""
     if os.environ.get("DEBUG_COTO") != "1":
         return jsonify(error="desactivado"), 404
     store = request.args.get("store", "Jumbo")
@@ -451,10 +459,8 @@ def api_debug_tienda():
             lines.append(f"ERROR de conexión: {e}")
     return Response("\n".join(lines), mimetype="text/plain; charset=utf-8")
 
-
 @app.get("/api/debug/coto")
 def api_debug_coto():
-    """Muestra la respuesta cruda de Coto para ajustar el parseo. Solo con DEBUG_COTO=1."""
     if os.environ.get("DEBUG_COTO") != "1":
         return jsonify(error="desactivado"), 404
     q = request.args.get("q", "leche")
@@ -481,11 +487,9 @@ def api_debug_coto():
         }, ensure_ascii=False))
     return Response("\n".join(lines), mimetype="text/plain; charset=utf-8")
 
-
 @app.get("/")
 def index():
     return send_from_directory(Path(app.static_folder), "index.html")
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), debug=False)

@@ -1,11 +1,16 @@
 {
   "name": "Comparador de precios",
   "short_name": "Precios",
+  "description": "Compará precios de supermercados por código de barras o nombre.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f6f7f4",
-  "theme_color": "#1f7a4d",
+  "orientation": "portrait",
+  "background_color": "#f2f4f7",
+  "theme_color": "#14182b",
+  "lang": "es-AR",
   "icons": [
-    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ]
 }
